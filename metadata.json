@@ -1,0 +1,7 @@
+{
+  "name": "Caja Registradora - Gestión Comercial",
+  "description": "Una solución integral para pequeños negocios: inventario, ventas, crédito y analítica sincronizada con Google Sheets.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
