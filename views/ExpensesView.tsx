@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
-import { Expense } from '../types';
-import { TrendingDown, Plus, DollarSign, Calendar, Tag, Edit2, Trash2, Loader2, X, AlertTriangle } from 'lucide-react';
+import { Expense, ExpenseCategory } from '../types';
+import { TrendingDown, Plus, DollarSign, Tag, Edit2, Trash2, Loader2, X, AlertTriangle, Layers } from 'lucide-react';
 
 const ExpensesView: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -21,29 +21,46 @@ const ExpensesView: React.FC = () => {
       const data = await dbService.getExpenses();
       setExpenses(data);
     } catch (err) {
-      console.error(err);
+      console.error("Error cargando egresos:", err);
     }
   };
 
   const handleSaveExpense = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
     const formData = new FormData(e.currentTarget);
+    const amountStr = formData.get('amount') as string;
+    const amount = Number(amountStr);
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("Por favor ingresa un monto válido mayor a 0.");
+      setLoading(false);
+      return;
+    }
+
     const expenseData: Partial<Expense> = {
-      id: editingExpense?.id,
-      amount: Number(formData.get('amount')),
-      description: formData.get('description') as string,
+      id: editingExpense?.id, // Si existe, actualiza; si no, saveExpense crea UUID
+      amount: amount,
+      description: (formData.get('description') as string).trim() || 'Gasto General',
+      category: formData.get('category') as ExpenseCategory,
       date: editingExpense ? editingExpense.date : new Date().toISOString()
     };
     
     try {
+      console.log("Enviando gasto a dbService:", expenseData);
       await dbService.saveExpense(expenseData);
-      await loadExpenses();
+      
+      // Limpiar y cerrar antes de recargar para evitar doble envío
       setIsModalOpen(false);
       setEditingExpense(null);
-    } catch (err) {
-      alert("Error al guardar gasto");
-      console.error(err);
+      
+      // Refrescar lista
+      await loadExpenses();
+    } catch (err: any) {
+      console.error("Error capturado en vista:", err);
+      alert(`Error crítico al registrar: ${err.message || 'Sin respuesta del servidor'}`);
     } finally {
       setLoading(false);
     }
@@ -54,20 +71,14 @@ const ExpensesView: React.FC = () => {
     setLoading(true);
     try {
       await dbService.deleteExpense(expenseToDelete.id);
-      await loadExpenses();
       setIsDeleteModalOpen(false);
       setExpenseToDelete(null);
-    } catch (err) {
-      alert("Error al eliminar el gasto");
-      console.error(err);
+      await loadExpenses();
+    } catch (err: any) {
+      alert(`Error al eliminar: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  };
-
-  const openDeleteModal = (expense: Expense) => {
-    setExpenseToDelete(expense);
-    setIsDeleteModalOpen(true);
   };
 
   const openEditModal = (expense: Expense) => {
@@ -97,6 +108,7 @@ const ExpensesView: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
                   <th className="px-8 py-5">Descripción del Gasto</th>
+                  <th className="px-8 py-5">Categoría</th>
                   <th className="px-8 py-5">Fecha</th>
                   <th className="px-8 py-5 text-right">Monto</th>
                   <th className="px-8 py-5 text-center">Acciones</th>
@@ -106,6 +118,11 @@ const ExpensesView: React.FC = () => {
                 {expenses.map(expense => (
                   <tr key={expense.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-8 py-5 font-bold text-slate-800">{expense.description}</td>
+                    <td className="px-8 py-5">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${expense.category === 'Reabastecimiento' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                        {expense.category}
+                      </span>
+                    </td>
                     <td className="px-8 py-5 text-slate-400 text-xs font-bold uppercase">
                       {new Date(expense.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
@@ -122,7 +139,7 @@ const ExpensesView: React.FC = () => {
                           <Edit2 size={16} />
                         </button>
                         <button 
-                          onClick={() => openDeleteModal(expense)}
+                          onClick={() => { setExpenseToDelete(expense); setIsDeleteModalOpen(true); }}
                           className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                           title="Eliminar registro"
                         >
@@ -134,7 +151,7 @@ const ExpensesView: React.FC = () => {
                 ))}
                 {expenses.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-24 text-center">
+                    <td colSpan={5} className="py-24 text-center">
                       <TrendingDown size={64} className="mx-auto text-slate-100 mb-4" />
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No hay registros contables</p>
                     </td>
@@ -155,15 +172,8 @@ const ExpensesView: React.FC = () => {
               ${expenses.reduce((acc, e) => acc + e.amount, 0).toLocaleString()}
             </p>
             <p className="text-xs text-rose-100 mt-6 font-medium leading-relaxed">
-              Este monto se deduce automáticamente de tus ventas brutas para el cálculo de utilidades en el Dashboard.
+              Recuerda: Los gastos operativos de tu negocio afectan tu utilidad neta en el Dashboard.
             </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm border-l-4 border-l-rose-500">
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Última operación</p>
-             <p className="text-sm font-bold text-slate-700 truncate">
-               {expenses[0]?.description || 'Sin registros recientes'}
-             </p>
           </div>
         </div>
       </div>
@@ -171,7 +181,7 @@ const ExpensesView: React.FC = () => {
       {/* Modal Crear/Editar Gasto */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsModalOpen(false)} />
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => !loading && setIsModalOpen(false)} />
           <form onSubmit={handleSaveExpense} className="relative bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-2">
               <div>
@@ -180,12 +190,29 @@ const ExpensesView: React.FC = () => {
                 </h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Gestión de flujo de caja</p>
               </div>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-slate-600 transition-all">
+              <button type="button" onClick={() => setIsModalOpen(false)} disabled={loading} className="text-slate-300 hover:text-slate-600 transition-all">
                 <X size={24} />
               </button>
             </div>
 
             <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría Contable</label>
+                <div className="relative">
+                  <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <select 
+                    name="category" 
+                    key={editingExpense?.id || 'new'}
+                    defaultValue={editingExpense?.category || 'Otros'}
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none font-bold appearance-none"
+                    disabled={loading}
+                  >
+                    <option value="Otros">Otros (Sueldos, Servicios, Alquiler)</option>
+                    <option value="Reabastecimiento">Reabastecimiento (Compra Stock)</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Concepto / Descripción</label>
                 <div className="relative">
@@ -196,6 +223,7 @@ const ExpensesView: React.FC = () => {
                     placeholder="Ej: Pago de luz, Alquiler, Proveedor..." 
                     required 
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none font-bold" 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -212,6 +240,7 @@ const ExpensesView: React.FC = () => {
                     defaultValue={editingExpense?.amount}
                     placeholder="0.00" 
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none font-black text-xl" 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -227,8 +256,8 @@ const ExpensesView: React.FC = () => {
       {/* Modal de Confirmación de Borrado */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsDeleteModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => !loading && setIsDeleteModalOpen(false)} />
+          <div className="relative bg-white w-full max-sm rounded-[2.5rem] p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200">
             <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
               <AlertTriangle size={40} />
             </div>
@@ -236,8 +265,7 @@ const ExpensesView: React.FC = () => {
             <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">¿Confirmar Borrado?</h3>
             <p className="text-slate-500 font-medium mb-6">
               Estás a punto de eliminar el registro: <br/>
-              <span className="font-black text-slate-800 underline decoration-rose-300">"{expenseToDelete?.description}"</span> <br/>
-              por un monto de <span className="font-black text-rose-600">${expenseToDelete?.amount.toLocaleString()}</span>.
+              <span className="font-black text-slate-800">"{expenseToDelete?.description}"</span>
             </p>
 
             <div className="flex flex-col gap-3">
@@ -250,13 +278,12 @@ const ExpensesView: React.FC = () => {
               </button>
               <button 
                 onClick={() => { setIsDeleteModalOpen(false); setExpenseToDelete(null); }}
+                disabled={loading}
                 className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all"
               >
                 Cancelar
               </button>
             </div>
-            
-            <p className="mt-6 text-[10px] font-black text-slate-300 uppercase tracking-widest">Esta acción afectará tus balances netos</p>
           </div>
         </div>
       )}

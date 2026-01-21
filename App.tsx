@@ -39,9 +39,8 @@ const App: React.FC = () => {
     }
   });
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<ViewType>('sales'); // Por defecto a ventas para agilidad móvil
+  const [currentView, setCurrentView] = useState<ViewType>('sales');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
@@ -230,12 +229,13 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24 lg:pb-10 bg-slate-50 hide-scrollbar">
-          <div className="max-w-7xl mx-auto h-full">{renderView()}</div>
+        {/* CONTENEDOR DE VISTAS: Se aumentó el padding inferior para móvil (pb-32) */}
+        <div className="flex-1 overflow-y-auto p-4 lg:p-10 pb-32 lg:pb-10 bg-slate-50 hide-scrollbar">
+          <div className="max-w-7xl mx-auto">{renderView()}</div>
         </div>
 
         {/* Bottom Navigation for Mobile */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
           <NavItem view="sales" icon={ShoppingCart} label="Venta" mobile />
           <NavItem view="inventory" icon={Package} label="Stock" mobile />
           <NavItem view="sales_history" icon={History} label="Hist" mobile />

@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign, Tag } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
 const InventoryView: React.FC = () => {
@@ -11,8 +11,10 @@ const InventoryView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReplenishOpen, setIsReplenishOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForBarcode, setProductForBarcode] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Estados para la calculadora del Formulario Principal
@@ -138,6 +140,28 @@ const InventoryView: React.FC = () => {
     }
   };
 
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setLoading(true);
+    try {
+      await dbService.deleteProduct(productToDelete.id);
+      await fetchProducts();
+      setIsDeleteModalOpen(false);
+      setProductToDelete(null);
+      setIsModalOpen(false); // Close edit modal if open
+      setEditingProduct(null);
+    } catch (err) {
+      alert("No se pudo eliminar el producto. Verifique si tiene ventas asociadas.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openDeleteConfirmation = (product: Product) => {
+    setProductToDelete(product);
+    setIsDeleteModalOpen(true);
+  };
+
   const handleReplenish = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -221,7 +245,10 @@ const InventoryView: React.FC = () => {
                   <td className="px-8 py-6">
                     <div className="flex flex-col">
                       <span className="font-black text-slate-800 text-base">{p.name}</span>
-                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.barcode || 'Manual'}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.barcode || 'Manual'}</span>
+                        <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest px-1.5 py-0.5 bg-blue-50 rounded-md">{p.category || 'General'}</span>
+                      </div>
                     </div>
                   </td>
                   <td className="px-8 py-6">
@@ -237,6 +264,7 @@ const InventoryView: React.FC = () => {
                       <button onClick={() => { setProductForBarcode(p); setIsBarcodeModalOpen(true); }} className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200" title="Código Barras"><Barcode size={18}/></button>
                       <button onClick={() => { setEditingProduct(p); setReplenishQty(0); setReplenishUnitCost(p.cost); setReplenishTotalCost(0); setIsReplenishOpen(true); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100" title="Reponer Stock"><RefreshCw size={18}/></button>
                       <button onClick={() => { setEditingProduct(p); setIsModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100" title="Editar"><Edit2 size={18}/></button>
+                      <button onClick={() => openDeleteConfirmation(p)} className="p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100" title="Eliminar"><Trash2 size={18}/></button>
                     </div>
                   </td>
                 </tr>
@@ -252,8 +280,20 @@ const InventoryView: React.FC = () => {
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-4xl h-[95vh] sm:h-auto rounded-t-[3rem] sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95">
             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Ficha Técnica Item</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400"><X size={28} /></button>
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
+              <div className="flex items-center gap-2">
+                {editingProduct && (
+                  <button 
+                    type="button" 
+                    onClick={() => openDeleteConfirmation(editingProduct)}
+                    className="p-3 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-2xl transition-all"
+                    title="Eliminar Producto"
+                  >
+                    <Trash2 size={24} />
+                  </button>
+                )}
+                <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400"><X size={28} /></button>
+              </div>
             </div>
             <form onSubmit={handleSaveProduct} className="p-8 lg:p-10 space-y-8 overflow-y-auto hide-scrollbar flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -262,6 +302,13 @@ const InventoryView: React.FC = () => {
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Producto</label>
                     <input name="name" defaultValue={editingProduct?.name} required className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
+                    <div className="relative">
+                      <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                      <input name="category" defaultValue={editingProduct?.category} placeholder="Ej: Bebidas, Alimentos, Limpieza..." className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Código Barra / SKU</label>
@@ -332,11 +379,45 @@ const InventoryView: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Confirmación de Borrado de Producto */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsDeleteModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200">
+            <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <AlertTriangle size={40} />
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">¿Eliminar Producto?</h3>
+            <p className="text-slate-500 font-medium mb-6">
+              Estás a punto de eliminar <span className="font-black text-slate-800 underline decoration-rose-300">"{productToDelete?.name}"</span>. <br/>
+              Esta acción no se puede deshacer y fallará si el producto tiene historial de ventas.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={handleDeleteProduct}
+                disabled={loading}
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-rose-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : 'Sí, Eliminar Producto'}
+              </button>
+              <button 
+                onClick={() => { setIsDeleteModalOpen(false); setProductToDelete(null); }}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Reponer Stock con Calculadora Similar */}
       {isReplenishOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsReplenishOpen(false)} />
-          <form onSubmit={handleReplenish} className="relative bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+          <form onSubmit={handleReplenish} className="relative bg-white w-full max-md rounded-[3rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Entrada de Mercancía</h3>
               <Calculator size={20} className="text-blue-500" />

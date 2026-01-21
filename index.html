@@ -22,15 +22,21 @@
             animation: bounce-short 2s ease-in-out infinite;
         }
 
-        /* Corrección definitiva para impresión */
+        /* Corrección definitiva para impresión de Balances */
         @media print {
+            @page {
+                size: A4;
+                margin: 1cm;
+            }
             body, html {
                 overflow: visible !important;
                 height: auto !important;
                 background: white !important;
                 position: static !important;
+                color: black !important;
             }
-            aside, header, .print\:hidden, button, .modal-overlay {
+            /* Ocultar elementos de navegación e interfaz */
+            aside, header, nav, .print\:hidden, button, .modal-overlay, .lg\:hidden {
                 display: none !important;
             }
             main {
@@ -40,8 +46,9 @@
                 margin: 0 !important;
                 position: static !important;
                 display: block !important;
+                background: white !important;
             }
-            #root, main > div, .max-w-6xl {
+            #root, main > div, .max-w-7xl {
                 overflow: visible !important;
                 height: auto !important;
                 width: 100% !important;
@@ -49,6 +56,20 @@
                 margin: 0 !important;
                 padding: 0 !important;
                 display: block !important;
+            }
+            /* Ajustes estéticos para las tarjetas en el PDF */
+            .bg-white {
+                border: 1px solid #e2e8f0 !important;
+                box-shadow: none !important;
+                border-radius: 12px !important;
+                break-inside: avoid;
+            }
+            .text-slate-800 { color: #1e293b !important; }
+            .bg-slate-50 { background: white !important; }
+            
+            /* Asegurar que los gráficos sean visibles */
+            svg {
+                max-width: 100% !important;
             }
         }
     </style>

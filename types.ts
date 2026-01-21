@@ -57,12 +57,15 @@ export interface CreditPayment {
   date: string;
 }
 
+export type ExpenseCategory = 'Reabastecimiento' | 'Otros';
+
 export interface Expense {
   id: string;
   userId: string;
   amount: number;
   description: string;
   date: string;
+  category: ExpenseCategory;
 }
 
 export type ViewType = 'dashboard' | 'inventory' | 'sales' | 'sales_history' | 'clients' | 'credit' | 'expenses' | 'settings';
