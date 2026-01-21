@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product, Client, SaleItem, SaleStatus, Sale } from '../types';
-import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, AlertTriangle, ScanLine, UserPlus, Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, ScanLine, UserPlus, Loader2, X, ChevronDown, Camera, Check } from 'lucide-react';
+import { Html5Qrcode } from "html5-qrcode";
 
 const SalesView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,76 +14,150 @@ const SalesView: React.FC = () => {
   const [clientSearch, setClientSearch] = useState('');
   const [saleStatus, setSaleStatus] = useState<SaleStatus>(SaleStatus.COMPLETED);
   const [amountPaid, setAmountPaid] = useState<string>('');
-  const [isCreatingClient, setIsCreatingClient] = useState(false);
-  const [isCartVisible, setIsCartVisible] = useState(false); // Para mobile drawer
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [isCartVisible, setIsCartVisible] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerLoading, setScannerLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastProcessedRef = useRef<number>(0);
 
   useEffect(() => {
-    dbService.getProducts().then(setProducts).catch(console.error);
-    dbService.getClients().then(setClients).catch(console.error);
+    const loadData = async () => {
+      try {
+        const [p, c] = await Promise.all([dbService.getProducts(), dbService.getClients()]);
+        setProducts(p);
+        setClients(c);
+      } catch (err) {
+        console.error("Error loading sales data:", err);
+      }
+    };
+    loadData();
   }, []);
+
+  // Effect to handle scanner initialization once the DOM element is available
+  useEffect(() => {
+    let isMounted = true;
+
+    const initScanner = async () => {
+      if (!isScannerOpen) return;
+      
+      // Give React a moment to render the scanner-region div
+      setScannerLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const element = document.getElementById("scanner-region");
+      if (!element) {
+        console.error("Scanner region not found in DOM");
+        setScannerLoading(false);
+        return;
+      }
+
+      try {
+        const scanner = new Html5Qrcode("scanner-region");
+        scannerRef.current = scanner;
+        
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 180 } },
+          (decodedText) => {
+            const product = products.find(p => p.barcode === decodedText);
+            if (product && isMounted) {
+              addToCart(product);
+              closeScanner();
+            }
+          },
+          () => {}
+        );
+        if (isMounted) setScannerLoading(false);
+      } catch (err) {
+        console.error("Scanner start error:", err);
+        if (isMounted) {
+          alert("No se pudo iniciar la cámara. Verifique los permisos.");
+          setIsScannerOpen(false);
+        }
+      }
+    };
+
+    if (isScannerOpen) {
+      initScanner();
+    }
+
+    return () => {
+      isMounted = false;
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
+      }
+    };
+  }, [isScannerOpen, products]);
 
   const addToCart = (product: Product) => {
     const now = Date.now();
-    if (now - lastProcessedRef.current < 200) return;
+    if (now - lastProcessedRef.current < 500) return; 
     lastProcessedRef.current = now;
+
     if (product.stock <= 0) {
-      alert("¡Sin Stock disponible!");
+      alert(`¡Sin stock de ${product.name}!`);
       return;
     }
+
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
+        if (existing.quantity >= product.stock) {
+          alert("Límite de stock alcanzado");
+          return prev;
+        }
         return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
       return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1 }];
     });
     setSearchTerm('');
+    if (navigator.vibrate) navigator.vibrate(50);
   };
 
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm || searchTerm.length < 2) return [];
-    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.barcode && p.barcode.includes(searchTerm)));
-  }, [products, searchTerm]);
-
-  const filteredClients = useMemo(() => {
-    if (!clientSearch) return [];
-    return clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
-  }, [clients, clientSearch]);
-
-  const total = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), [cart]);
-
-  const updateQuantity = (id: string, delta: number) => {
+  const updateQuantity = (productId: string, delta: number) => {
     setCart(prev => prev.map(item => {
-      if (item.productId === id) {
+      if (item.productId === productId) {
+        const product = products.find(p => p.id === productId);
         const newQty = Math.max(0, item.quantity + delta);
+        if (product && newQty > product.stock) {
+          alert("Stock máximo alcanzado");
+          return item;
+        }
         return { ...item, quantity: newQty };
       }
       return item;
     }).filter(item => item.quantity > 0));
   };
 
-  const handleQuickCreateClient = async () => {
-    if (!clientSearch.trim()) return;
-    setIsCreatingClient(true);
-    try {
-      const newClient = await dbService.saveClient({ name: clientSearch.trim(), phone: '', email: '', currentDebt: 0 });
-      const updatedClients = await dbService.getClients();
-      setClients(updatedClients);
-      setSelectedClient(newClient);
-      setClientSearch('');
-    } catch (err) {
-      alert("Error al crear cliente");
-    } finally { setIsCreatingClient(false); }
-  };
+  const openScanner = () => setIsScannerOpen(true);
+  const closeScanner = () => setIsScannerOpen(false);
+
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    return products.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (p.barcode && p.barcode.includes(searchTerm))
+    ).slice(0, 5);
+  }, [products, searchTerm]);
+
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return [];
+    return clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 4);
+  }, [clients, clientSearch]);
+
+  const total = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), [cart]);
 
   const handleProcessSale = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || processing) return;
     if (saleStatus === SaleStatus.CREDIT && !selectedClient) {
-      alert('Debes seleccionar un cliente para ventas a crédito');
+      alert('Por favor, seleccione un cliente para ventas a crédito.');
       return;
     }
+
+    setProcessing(true);
     const sale: Partial<Sale> = {
       id: crypto.randomUUID(),
       clientId: selectedClient?.id,
@@ -90,54 +165,65 @@ const SalesView: React.FC = () => {
       total,
       date: new Date().toISOString(),
       status: saleStatus,
-      amountPaid: saleStatus === SaleStatus.CREDIT ? Number(amountPaid) : total
+      amountPaid: saleStatus === SaleStatus.CREDIT ? Number(amountPaid || 0) : total
     };
+
     try {
       await dbService.createSale(sale);
-      alert('¡Venta Exitosa!');
       setCart([]);
       setSelectedClient(null);
       setAmountPaid('');
-      setSaleStatus(SaleStatus.COMPLETED);
+      setClientSearch('');
       setIsCartVisible(false);
-      dbService.getProducts().then(setProducts);
-    } catch (err) { alert("Error procesando venta"); }
+      const updatedProducts = await dbService.getProducts();
+      setProducts(updatedProducts);
+      alert('¡Venta realizada con éxito!');
+    } catch (err) {
+      console.error(err);
+      alert("Error al procesar la venta.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-6 animate-in fade-in duration-500 pb-20 lg:pb-0">
-      {/* Terminal Area */}
+    <div className="h-full flex flex-col lg:flex-row gap-6 animate-in fade-in pb-20 lg:pb-0">
       <div className="flex-1 flex flex-col space-y-4 lg:space-y-6">
-        <div className="bg-white p-5 lg:p-7 rounded-[2rem] border border-slate-200 shadow-sm space-y-4 lg:space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs lg:text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-[0.2em]">
-              <ScanLine size={20} className="text-blue-500" /> Terminal Táctil
+        
+        {/* Terminal de Búsqueda */}
+        <div className="bg-white p-5 lg:p-7 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <ScanLine size={16} className="text-blue-500" /> Terminal de Ventas
             </h3>
-            <span className="text-[9px] lg:text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg border border-emerald-100">Activo</span>
+            <button 
+              onClick={openScanner}
+              className="lg:hidden p-3 bg-blue-600 text-white rounded-2xl shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+            >
+              <Camera size={18} /> Escanear
+            </button>
           </div>
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={24} />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={24} />
             <input 
-              ref={searchInputRef}
               type="text" 
-              placeholder="Producto o EAN..." 
-              className="w-full pl-14 pr-4 py-4 lg:py-6 bg-slate-50 border border-slate-200 rounded-3xl focus:ring-4 focus:ring-blue-100 outline-none text-base lg:text-xl font-black transition-all"
+              placeholder="Escribe nombre o código del producto..." 
+              className="w-full pl-16 pr-4 py-5 lg:py-6 bg-slate-50 border border-slate-200 rounded-3xl outline-none text-base lg:text-xl font-black transition-all focus:bg-white focus:ring-4 focus:ring-blue-50 shadow-inner"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            
             {filteredProducts.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-200 rounded-[2.5rem] shadow-2xl z-[80] max-h-[60vh] overflow-y-auto divide-y divide-slate-50 overflow-hidden animate-in fade-in slide-in-from-top-4">
+              <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-200 rounded-[2rem] shadow-2xl z-[80] overflow-hidden animate-in slide-in-from-top-2 duration-200">
                 {filteredProducts.map(p => (
-                  <button key={p.id} onClick={() => addToCart(p)} className="w-full p-5 lg:p-7 flex items-center justify-between hover:bg-blue-50 active:bg-blue-100 transition-all text-left">
-                    <div>
-                      <p className="font-black text-slate-800 text-base lg:text-xl">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded">{p.category}</span>
-                        <span className={`text-[10px] font-black uppercase ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-400'}`}>Stock: {p.stock} uds</span>
-                      </div>
+                  <button key={p.id} onClick={() => addToCart(p)} className="w-full p-5 flex items-center justify-between hover:bg-blue-50 transition-all text-left border-b border-slate-50 last:border-0 group">
+                    <div className="flex flex-col">
+                      <span className="font-black text-slate-800 group-hover:text-blue-600">{p.name}</span>
+                      <span className="text-[10px] font-black uppercase text-slate-400">Existencia: {p.stock} uds</span>
                     </div>
-                    <span className="font-black text-blue-600 text-xl lg:text-2xl">${p.price.toLocaleString()}</span>
+                    <div className="text-right">
+                      <p className="font-black text-blue-600 text-lg">${p.price.toLocaleString()}</p>
+                      <p className="text-[9px] font-bold text-emerald-500 uppercase">Añadir +</p>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -145,135 +231,166 @@ const SalesView: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-5 lg:p-7 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-[10px] lg:text-xs font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest">
-            <User size={18} className="text-blue-500" /> Vínculo de Cliente
-          </h3>
-          {!selectedClient ? (
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Nombre del cliente..." 
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm lg:text-base"
-                value={clientSearch}
-                onChange={(e) => setClientSearch(e.target.value)}
-              />
-              {(filteredClients.length > 0 || clientSearch.length > 1) && (
-                <div className="absolute bottom-full lg:top-full left-0 right-0 mb-2 lg:mt-2 bg-white border border-slate-200 rounded-3xl shadow-2xl z-[75] overflow-hidden">
-                  {filteredClients.map(c => (
-                    <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); }} className="w-full p-4 text-left hover:bg-blue-50 flex items-center justify-between border-b border-slate-50 last:border-0">
-                      <div>
-                        <p className="font-bold text-slate-800">{c.name}</p>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">${c.currentDebt.toLocaleString()} Deuda</p>
-                      </div>
-                      <Plus size={18} className="text-blue-400" />
-                    </button>
-                  ))}
-                  {clientSearch.length > 1 && (
-                    <button onClick={handleQuickCreateClient} disabled={isCreatingClient} className="w-full p-5 bg-blue-600 text-white font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                      {isCreatingClient ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                      Registrar "{clientSearch}"
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-3xl border border-blue-100">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-200">{selectedClient.name.charAt(0)}</div>
-                <div>
-                  <p className="font-black text-blue-900 leading-none">{selectedClient.name}</p>
-                  <p className="text-[10px] text-blue-500 font-black uppercase mt-1 tracking-widest">Deuda: ${selectedClient.currentDebt.toLocaleString()}</p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedClient(null)} className="p-2 bg-white text-rose-500 rounded-xl border border-rose-100 hover:bg-rose-50"><X size={18}/></button>
-            </div>
-          )}
+        {/* Selector de Cliente */}
+        <div className="bg-white p-5 lg:p-7 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Cliente / Receptor</h3>
+           <div className="relative">
+             <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+             <input 
+               type="text" 
+               placeholder="Venta de contado (Escriba para buscar cliente)" 
+               className="w-full pl-14 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700"
+               value={selectedClient ? selectedClient.name : clientSearch}
+               onChange={(e) => {
+                 setClientSearch(e.target.value);
+                 if (selectedClient) setSelectedClient(null);
+               }}
+             />
+             {selectedClient && (
+               <button onClick={() => { setSelectedClient(null); setClientSearch(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-rose-500"><X size={18}/></button>
+             )}
+             {filteredClients.length > 0 && !selectedClient && (
+               <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[70] overflow-hidden">
+                 {filteredClients.map(c => (
+                   <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); }} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-all border-b last:border-0">
+                      <span className="font-bold text-slate-800">{c.name}</span>
+                      <span className="text-[10px] font-black text-blue-600 uppercase">Seleccionar</span>
+                   </button>
+                 ))}
+               </div>
+             )}
+           </div>
         </div>
-      </div>
 
-      {/* Cart Summary (Mobile Floating Button) */}
-      <div className="lg:hidden fixed bottom-20 left-4 right-4 z-[90]">
-        <button 
-          onClick={() => setIsCartVisible(true)}
-          disabled={cart.length === 0}
-          className={`w-full py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest flex items-center justify-between px-8 shadow-2xl transition-all ${cart.length > 0 ? 'bg-blue-600 text-white animate-bounce-short' : 'bg-slate-200 text-slate-400 opacity-50'}`}
-        >
-          <div className="flex items-center gap-3">
-             <ShoppingCart size={20} />
-             <span>Ver Carrito ({cart.length})</span>
-          </div>
-          <span className="text-lg">${total.toLocaleString()}</span>
-        </button>
-      </div>
-
-      {/* Checkout Area (Desktop static, Mobile Drawer) */}
-      <div className={`fixed lg:static inset-0 z-[100] lg:z-auto bg-slate-900/60 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none transition-all duration-300 ${isCartVisible ? 'opacity-100 visible' : 'opacity-0 invisible lg:visible lg:opacity-100'}`}>
-        <div className={`absolute lg:static bottom-0 left-0 right-0 w-full lg:w-[460px] max-h-[90vh] lg:max-h-none bg-white lg:bg-white rounded-t-[3rem] lg:rounded-[3rem] border-t lg:border border-slate-200 shadow-2xl flex flex-col transform transition-transform duration-300 ${isCartVisible ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
-          <div className="p-6 lg:p-8 bg-slate-50 border-b border-slate-200 flex items-center justify-between sticky top-0 z-10">
-            <div className="flex items-center gap-3">
-              <ShoppingCart size={22} className="text-blue-600" />
-              <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs lg:text-sm">Resumen de Venta</h3>
+        {/* Carrito en Móvil (Visible solo si hay items) */}
+        {cart.length > 0 && (
+          <button 
+            onClick={() => setIsCartVisible(true)}
+            className="lg:hidden fixed bottom-20 right-6 w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center z-[90] animate-bounce-short"
+          >
+            <div className="relative">
+              <ShoppingCart size={24} />
+              <span className="absolute -top-3 -right-3 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">{cart.length}</span>
             </div>
-            <button onClick={() => setIsCartVisible(false)} className="lg:hidden p-2 text-slate-400"><ChevronDown size={28}/></button>
+          </button>
+        )}
+      </div>
+
+      {/* Panel de Resumen (Derecha / Modal en móvil) */}
+      <div className={`fixed lg:static inset-0 z-[100] lg:z-0 lg:w-96 transform transition-transform duration-300 flex flex-col ${isCartVisible ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
+        <div className="absolute inset-0 bg-slate-900/40 lg:hidden" onClick={() => setIsCartVisible(false)} />
+        <div className="relative bg-white lg:bg-slate-900 h-[90vh] lg:h-full mt-auto lg:mt-0 rounded-t-[3rem] lg:rounded-[3rem] shadow-2xl flex flex-col lg:p-8 p-6 overflow-hidden">
+          
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-black text-slate-800 lg:text-white uppercase tracking-tighter flex items-center gap-2">
+               <ShoppingCart size={24} className="text-blue-500" /> Tu Carrito
+            </h3>
+            <button onClick={() => setIsCartVisible(false)} className="lg:hidden p-2 text-slate-400"><X size={28}/></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 lg:space-y-8 hide-scrollbar">
+          <div className="flex-1 overflow-y-auto hide-scrollbar space-y-4 mb-6">
             {cart.map(item => (
-              <div key={item.productId} className="flex items-start justify-between animate-in slide-in-from-right-4 duration-300">
-                <div className="flex-1 pr-4">
-                  <p className="text-sm lg:text-base font-black text-slate-800 leading-tight mb-0.5">{item.name}</p>
-                  <p className="text-xs text-slate-400 font-black">${item.price.toLocaleString()} c/u</p>
+              <div key={item.productId} className="bg-slate-50 lg:bg-white/5 p-4 rounded-3xl border border-slate-100 lg:border-white/10 flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-4">
+                  <p className="font-black text-slate-800 lg:text-white truncate text-sm">{item.name}</p>
+                  <p className="text-xs font-bold text-slate-400">${item.price.toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 border border-slate-200/50">
-                  <button onClick={() => updateQuantity(item.productId, -1)} className="p-1.5 bg-white text-slate-400 rounded-xl shadow-sm"><Minus size={14}/></button>
-                  <span className="text-sm font-black w-8 text-center text-slate-800">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.productId, 1)} className="p-1.5 bg-white text-slate-400 rounded-xl shadow-sm"><Plus size={14}/></button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 rounded-xl bg-white lg:bg-white/10 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><Minus size={14}/></button>
+                  <span className="font-black text-slate-800 lg:text-white w-6 text-center">{item.quantity}</span>
+                  <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 rounded-xl bg-white lg:bg-white/10 flex items-center justify-center text-slate-400 hover:text-blue-500 transition-colors shadow-sm"><Plus size={14}/></button>
                 </div>
               </div>
             ))}
             {cart.length === 0 && (
-              <div className="h-40 flex flex-col items-center justify-center text-slate-300">
-                <ShoppingCart size={48} className="opacity-20 mb-3" />
-                <p className="text-[10px] font-black uppercase tracking-widest">Carrito Vacío</p>
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50 space-y-4 py-20">
+                <ShoppingCart size={64} strokeWidth={1} />
+                <p className="text-[10px] font-black uppercase tracking-widest text-center">El carrito está vacío</p>
               </div>
             )}
           </div>
 
-          <div className="p-8 lg:p-10 border-t border-slate-100 bg-white space-y-8">
-            <div className="flex items-center justify-between">
-              <span className="font-black text-slate-400 uppercase tracking-widest text-[10px] lg:text-xs">Subtotal Neto</span>
-              <span className="font-black text-3xl lg:text-5xl text-blue-600 tracking-tighter">${total.toLocaleString()}</span>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">Tipo de Operación</p>
-              <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setSaleStatus(SaleStatus.COMPLETED)} className={`flex flex-col items-center justify-center py-5 rounded-3xl border-2 transition-all ${saleStatus === SaleStatus.COMPLETED ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-100 bg-white text-slate-400 opacity-60'}`}>
-                  <Wallet size={24} className="mb-2" />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Efectivo</span>
-                </button>
-                <button onClick={() => setSaleStatus(SaleStatus.CREDIT)} className={`flex flex-col items-center justify-center py-5 rounded-3xl border-2 transition-all ${saleStatus === SaleStatus.CREDIT ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-100 bg-white text-slate-400 opacity-60'}`}>
-                  <CreditCard size={24} className="mb-2" />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Crédito</span>
-                </button>
-              </div>
+          <div className="space-y-4 pt-6 border-t border-slate-100 lg:border-white/10">
+            {/* Método de Pago */}
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setSaleStatus(SaleStatus.COMPLETED)}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border-2 ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+              >
+                <Wallet size={16}/> Contado
+              </button>
+              <button 
+                onClick={() => setSaleStatus(SaleStatus.CREDIT)}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border-2 ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 border-amber-500 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+              >
+                <CreditCard size={16}/> Crédito
+              </button>
             </div>
 
             {saleStatus === SaleStatus.CREDIT && (
-              <div className="space-y-2 animate-in slide-in-from-top-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monto de Abono</label>
-                <input type="number" className="w-full px-6 py-5 bg-amber-50 border border-amber-100 rounded-3xl text-2xl font-black text-amber-700 outline-none" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} placeholder="0.00" />
+              <div className="animate-in slide-in-from-top-2 duration-300">
+                <input 
+                  type="number" 
+                  placeholder="Monto abonado hoy..." 
+                  className="w-full px-5 py-4 bg-slate-50 lg:bg-white/5 border border-slate-200 lg:border-white/10 rounded-2xl outline-none font-black text-slate-800 lg:text-white"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                />
               </div>
             )}
 
-            <button onClick={handleProcessSale} disabled={cart.length === 0} className="w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black text-xl lg:text-2xl transition-all shadow-2xl active:scale-95 uppercase tracking-[0.2em] shadow-slate-300">
-              Cerrar Venta
+            <div className="flex items-center justify-between text-slate-800 lg:text-white px-2">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Total a Pagar</span>
+              <span className="text-3xl font-black tracking-tighter">${total.toLocaleString()}</span>
+            </div>
+
+            <button 
+              onClick={handleProcessSale}
+              disabled={cart.length === 0 || processing}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 lg:disabled:bg-white/10 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-blue-100 lg:shadow-none flex items-center justify-center gap-3 transition-all active:scale-95 uppercase tracking-widest"
+            >
+              {processing ? <Loader2 className="animate-spin" size={24} /> : (
+                <><Check size={24} /> Finalizar Venta</>
+              )}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Modal de Escáner */}
+      {isScannerOpen && (
+        <div className="fixed inset-0 z-[200] flex flex-col bg-slate-900/95 animate-in fade-in duration-300">
+           <div className="flex items-center justify-between p-8 text-white">
+              <h4 className="font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3">
+                <Camera className="text-blue-500" /> Escáner Óptico
+              </h4>
+              <button onClick={closeScanner} className="p-4 bg-white/10 rounded-[2rem] hover:bg-white/20 transition-all"><X size={24}/></button>
+           </div>
+           <div className="flex-1 flex flex-col items-center justify-center p-6">
+              <div className="relative w-full max-w-sm aspect-[4/3] bg-black rounded-[3rem] border-4 border-white/10 overflow-hidden shadow-2xl">
+                 {scannerLoading && (
+                   <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/60 backdrop-blur-sm">
+                     <Loader2 className="text-blue-500 animate-spin" size={48} />
+                   </div>
+                 )}
+                 {/* The scanner library expects this ID in the DOM */}
+                 <div id="scanner-region" className="w-full h-full"></div>
+                 {/* Guía Visual */}
+                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-64 h-32 border-2 border-blue-500/60 rounded-2xl relative">
+                       <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 -mt-1 -ml-1 rounded-tl-lg"></div>
+                       <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 -mt-1 -mr-1 rounded-tr-lg"></div>
+                       <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 -mb-1 -ml-1 rounded-bl-lg"></div>
+                       <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 -mb-1 -mr-1 rounded-br-lg"></div>
+                    </div>
+                 </div>
+              </div>
+              <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mt-12 text-center px-12 leading-relaxed">
+                Alinee el código de barras dentro del marco para detección instantánea.
+              </p>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
