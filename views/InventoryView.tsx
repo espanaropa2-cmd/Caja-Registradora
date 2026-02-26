@@ -21,6 +21,7 @@ const InventoryView: React.FC = () => {
   const [formStock, setFormStock] = useState<number>(0);
   const [formUnitCost, setFormUnitCost] = useState<number>(0);
   const [formTotalCost, setFormTotalCost] = useState<number>(0);
+  const [formBarcode, setFormBarcode] = useState<string>('');
 
   // Estados para la calculadora del Modal de Reposición
   const [replenishQty, setReplenishQty] = useState<number>(0);
@@ -48,12 +49,31 @@ const InventoryView: React.FC = () => {
       setFormStock(editingProduct.stock);
       setFormUnitCost(editingProduct.cost);
       setFormTotalCost(editingProduct.stock * editingProduct.cost);
+      setFormBarcode(editingProduct.barcode || '');
     } else {
       setFormStock(0);
       setFormUnitCost(0);
       setFormTotalCost(0);
+      setFormBarcode('');
     }
   }, [editingProduct, isModalOpen]);
+
+  const generateSKU = () => {
+    let newSKU = '';
+    let isUnique = false;
+    const existingBarcodes = new Set(products.map(p => p.barcode).filter(b => b));
+    
+    let attempts = 0;
+    while (!isUnique && attempts < 100) {
+      // Generar un número aleatorio de 10 dígitos
+      newSKU = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      if (!existingBarcodes.has(newSKU)) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+    setFormBarcode(newSKU);
+  };
 
   // Lógica de cálculo bidireccional para el Modal Principal
   const updateFormByUnitCost = (unit: number) => {
@@ -97,11 +117,25 @@ const InventoryView: React.FC = () => {
         format: "CODE128",
         lineColor: "#000",
         width: 2,
-        height: 100,
+        height: 80,
         displayValue: true,
-        fontSize: 18,
-        textMargin: 10
+        fontSize: 14,
+        textMargin: 4,
+        marginTop: 35, // Espacio para el nombre del producto
       });
+
+      // Agregar el nombre del producto al SVG manualmente
+      const svg = barcodeRef.current;
+      const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      textElement.setAttribute("x", "50%");
+      textElement.setAttribute("y", "20");
+      textElement.setAttribute("text-anchor", "middle");
+      textElement.style.fontFamily = "Inter, sans-serif";
+      textElement.style.fontWeight = "900";
+      textElement.style.fontSize = "12px";
+      textElement.style.fill = "#000";
+      textElement.textContent = productForBarcode.name.toUpperCase();
+      svg.appendChild(textElement);
     }
   }, [isBarcodeModalOpen, productForBarcode]);
 
@@ -312,7 +346,23 @@ const InventoryView: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Código Barra / SKU</label>
-                    <input name="barcode" defaultValue={editingProduct?.barcode} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
+                    <div className="flex gap-2">
+                      <input 
+                        name="barcode" 
+                        value={formBarcode} 
+                        onChange={(e) => setFormBarcode(e.target.value)}
+                        placeholder="Escanee o ingrese código..."
+                        className="flex-1 px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" 
+                      />
+                      <button 
+                        type="button"
+                        onClick={generateSKU}
+                        className="px-4 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all flex items-center justify-center group"
+                        title="Generar SKU Aleatorio"
+                      >
+                        <RefreshCw size={20} className="group-active:rotate-180 transition-transform duration-500" />
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Precio Venta al Público ($)</label>
