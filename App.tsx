@@ -12,10 +12,15 @@ import {
   LogOut, 
   Menu, 
   TrendingDown,
+  Warehouse,
+  Shield,
+  Clock,
+  Lock,
   RefreshCw,
   Store,
   Loader2,
-  X
+  X,
+  CreditCard as CreditIcon
 } from 'lucide-react';
 import { ViewType, UserProfile } from './types';
 import DashboardView from './views/DashboardView';
@@ -27,6 +32,9 @@ import CreditView from './views/CreditView';
 import ExpensesView from './views/ExpensesView';
 import SettingsView from './views/SettingsView';
 import AuthView from './views/AuthView';
+import AdminView from './views/AdminView';
+
+const ADMIN_EMAIL = 'azliersylver@gmail.com';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -55,7 +63,11 @@ const App: React.FC = () => {
           id: data.id,
           businessName: data.business_name || 'Mi Negocio',
           email: data.email,
-          sheetsUrl: data.sheets_url
+          sheetsUrl: data.sheets_url,
+          subscriptionExpires: data.subscription_expires,
+          isBanned: data.is_banned,
+          alias: data.alias,
+          contactPhone: data.contact_phone
         };
         setProfile(newProfile);
         localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
@@ -135,6 +147,40 @@ const App: React.FC = () => {
 
   const renderView = () => {
     if (!profile) return null;
+    
+    // Si la cuenta está bloqueada, forzamos esa vista
+    const isSuperUser = profile.email === ADMIN_EMAIL;
+    const expired = !isSuperUser && profile.subscriptionExpires && new Date(profile.subscriptionExpires) < new Date();
+    const banned = !isSuperUser && profile.isBanned;
+
+    if (banned) {
+      return (
+        <div className="flex flex-col items-center justify-center p-12 text-center space-y-6">
+          <div className="w-24 h-24 bg-rose-100 text-rose-600 rounded-[2rem] flex items-center justify-center shadow-lg">
+            <Shield size={48} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-slate-800">Cuenta Suspendida</h2>
+            <p className="text-slate-500 max-w-md mx-auto">Tu acceso al sistema ha sido restringido por un administrador. Contacta con soporte para más información.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (expired) {
+      return (
+        <div className="flex flex-col items-center justify-center p-12 text-center space-y-6">
+          <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-[2rem] flex items-center justify-center shadow-lg">
+            <Clock size={48} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-slate-800">Suscripción Vencida</h2>
+            <p className="text-slate-500 max-w-md mx-auto">Tu periodo de acceso ha expirado el {new Date(profile.subscriptionExpires!).toLocaleDateString()}. Por favor renueva tu suscripción para continuar usando la plataforma.</p>
+          </div>
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'dashboard': return <DashboardView />;
       case 'inventory': return <InventoryView />;
@@ -143,9 +189,16 @@ const App: React.FC = () => {
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView />;
       case 'expenses': return <ExpensesView />;
-      case 'settings': return <SettingsView user={profile} onUpdateUser={(p) => {
+      case 'admin': return isSuperUser ? <AdminView /> : <DashboardView />;
+      case 'settings': return <SettingsView user={profile} onUpdateUser={async (p) => {
         setProfile(p);
         localStorage.setItem('cajapro_profile', JSON.stringify(p));
+        // Persistir en Supabase
+        await supabase.from('profiles').update({
+          business_name: p.businessName,
+          email: p.email,
+          sheets_url: p.sheetsUrl
+        }).eq('id', p.id);
       }} />;
       default: return <DashboardView />;
     }
@@ -177,12 +230,15 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="bg-blue-600 p-2.5 rounded-2xl text-white shadow-lg shadow-blue-100"><Store size={24} /></div>
-              <h1 className="text-xl font-black tracking-tighter text-slate-800">Caja Pro</h1>
+              <h1 className="text-xl font-black tracking-tighter text-slate-800 break-words">{profile?.businessName || 'Caja Pro'}</h1>
             </div>
             <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400"><X size={20}/></button>
           </div>
           
           <nav className="flex-1 space-y-1 overflow-y-auto hide-scrollbar">
+            {profile?.email === ADMIN_EMAIL && (
+              <NavItem view="admin" icon={Shield} label="Superusuario" />
+            )}
             <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
             <NavItem view="sales" icon={ShoppingCart} label="Nueva Venta" />
             <NavItem view="sales_history" icon={History} label="Historial" />

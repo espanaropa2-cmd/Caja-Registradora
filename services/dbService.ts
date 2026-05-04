@@ -349,5 +349,34 @@ export const dbService = {
       console.error("Error adding credit payment to expenses:", error);
       throw error;
     }
+  },
+
+  // Admin Methods
+  async getAllProfiles(): Promise<UserProfile[]> {
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      businessName: p.business_name || 'Sin Nombre',
+      email: p.email,
+      sheetsUrl: p.sheets_url,
+      subscriptionExpires: p.subscription_expires,
+      isBanned: p.is_banned,
+      alias: p.alias,
+      contactPhone: p.contact_phone
+    }));
+  },
+
+  async updateProfileByAdmin(profileId: string, updates: Partial<UserProfile>) {
+    const dbUpdates: any = {};
+    if (updates.businessName !== undefined) dbUpdates.business_name = updates.businessName;
+    if (updates.sheetsUrl !== undefined) dbUpdates.sheets_url = updates.sheetsUrl;
+    if (updates.subscriptionExpires !== undefined) dbUpdates.subscription_expires = updates.subscriptionExpires;
+    if (updates.isBanned !== undefined) dbUpdates.is_banned = updates.isBanned;
+    if (updates.alias !== undefined) dbUpdates.alias = updates.alias;
+    if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
+
+    const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', profileId);
+    if (error) throw error;
   }
 };

@@ -4,6 +4,10 @@ export interface UserProfile {
   businessName: string;
   email: string;
   sheetsUrl?: string;
+  subscriptionExpires?: string;
+  isBanned?: boolean;
+  alias?: string;
+  contactPhone?: string;
 }
 
 export interface Product {
@@ -69,4 +73,4 @@ export interface Expense {
   category: ExpenseCategory;
 }
 
-export type ViewType = 'dashboard' | 'inventory' | 'sales' | 'sales_history' | 'clients' | 'credit' | 'expenses' | 'settings';
+export type ViewType = 'dashboard' | 'inventory' | 'sales' | 'sales_history' | 'clients' | 'credit' | 'expenses' | 'settings' | 'admin';
