@@ -1,6 +1,6 @@
 
 import { supabase } from '../supabaseClient';
-import { Product, Client, Sale, Expense, SaleStatus, ExpenseCategory } from '../types';
+import { Product, Client, Sale, Expense, SaleStatus, ExpenseCategory, CreditPayment } from '../types';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -12,6 +12,7 @@ const generateUUID = () => {
 // Prefijos para emular categorías si la columna no existe en la DB
 const REAB_PREFIX = "📦 [REAB] ";
 const OTRO_PREFIX = "💸 [OTRO] ";
+const ABONO_PREFIX = "💰 [ABONO] ";
 
 export const dbService = {
   // Productos
@@ -122,27 +123,29 @@ export const dbService = {
     
     if (error) throw error;
     
-    return (data || []).map(e => {
-      let category: ExpenseCategory = 'Otros';
-      let cleanDescription = e.description || '';
+    return (data || [])
+      .filter(e => !(e.description || '').startsWith(ABONO_PREFIX)) // Filter out abonos from expenses view
+      .map(e => {
+        let category: ExpenseCategory = 'Otros';
+        let cleanDescription = e.description || '';
 
-      if (cleanDescription.startsWith(REAB_PREFIX)) {
-        category = 'Reabastecimiento';
-        cleanDescription = cleanDescription.replace(REAB_PREFIX, '');
-      } else if (cleanDescription.startsWith(OTRO_PREFIX)) {
-        category = 'Otros';
-        cleanDescription = cleanDescription.replace(OTRO_PREFIX, '');
-      }
+        if (cleanDescription.startsWith(REAB_PREFIX)) {
+          category = 'Reabastecimiento';
+          cleanDescription = cleanDescription.replace(REAB_PREFIX, '');
+        } else if (cleanDescription.startsWith(OTRO_PREFIX)) {
+          category = 'Otros';
+          cleanDescription = cleanDescription.replace(OTRO_PREFIX, '');
+        }
 
-      return {
-        id: e.id,
-        userId: e.user_id,
-        amount: e.amount,
-        description: cleanDescription,
-        date: e.date,
-        category: category
-      };
-    });
+        return {
+          id: e.id,
+          userId: e.user_id,
+          amount: e.amount,
+          description: cleanDescription,
+          date: e.date,
+          category: category
+        };
+      });
   },
 
   async saveExpense(expense: Partial<Expense>) {
@@ -291,5 +294,60 @@ export const dbService = {
     }
     const { data: client } = await supabase.from('clients').select('current_debt').eq('id', clientId).single();
     if (client) await supabase.from('clients').update({ current_debt: Math.max(0, client.current_debt - totalAmount) }).eq('id', clientId);
+    
+    // Registrar el abono en el historial
+    await this.addCreditPayment({
+      clientId: clientId,
+      amount: totalAmount,
+      date: new Date().toISOString()
+    });
+  },
+
+  // Abonos (Credit Payments) using expenses table as fallback storage
+  async getCreditPayments(clientId?: string): Promise<CreditPayment[]> {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .filter('description', 'ilike', `${ABONO_PREFIX}%`)
+      .order('date', { ascending: false });
+    
+    if (error) {
+      console.warn("Could not fetch credit payments from expenses:", error);
+      return [];
+    }
+
+    return (data || []).map(p => {
+      const parts = p.description.replace(ABONO_PREFIX, '').split('|');
+      const cid = parts[1] || '';
+      return {
+        id: p.id,
+        saleId: parts[2] || '',
+        amount: p.amount,
+        date: p.date,
+        clientId: cid
+      };
+    }).filter(p => !clientId || p.clientId === clientId);
+  },
+
+  async addCreditPayment(payment: { clientId: string, amount: number, date: string }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No autenticado");
+
+    // Store as expense with prefix for backward compatibility and guaranteed table presence
+    // Format: "💰 [ABONO] |CLIENT_ID|SALE_ID"
+    const description = `${ABONO_PREFIX}|${payment.clientId}|`;
+
+    const { error } = await supabase.from('expenses').insert({
+      id: generateUUID(),
+      description: description,
+      amount: payment.amount,
+      date: payment.date,
+      user_id: user.id
+    });
+
+    if (error) {
+      console.error("Error adding credit payment to expenses:", error);
+      throw error;
+    }
   }
 };

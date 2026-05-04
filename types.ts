@@ -52,7 +52,8 @@ export interface Sale {
 
 export interface CreditPayment {
   id: string;
-  saleId: string;
+  clientId: string;
+  saleId?: string;
   amount: number;
   date: string;
 }

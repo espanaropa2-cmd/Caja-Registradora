@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/dbService';
-import { SaleStatus, Sale, Client } from '../types';
-import { CreditCard, AlertCircle, RefreshCw, Loader2, DollarSign, CheckCircle2, Circle, Calendar, Hash, UserCircle, X, ChevronRight } from 'lucide-react';
+import { SaleStatus, Sale, Client, CreditPayment } from '../types';
+import { CreditCard, AlertCircle, RefreshCw, Loader2, DollarSign, CheckCircle2, Circle, Calendar, Hash, UserCircle, X, ChevronRight, History } from 'lucide-react';
 
 const CreditView: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [creditPayments, setCreditPayments] = useState<CreditPayment[]>([]);
   const [isAbonoOpen, setIsAbonoOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set());
@@ -15,12 +16,14 @@ const CreditView: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [allSales, allClients] = await Promise.all([
+      const [allSales, allClients, allPayments] = await Promise.all([
         dbService.getSales(),
-        dbService.getClients()
+        dbService.getClients(),
+        dbService.getCreditPayments()
       ]);
       setSales(allSales.filter(s => s.status === SaleStatus.CREDIT && (s.total - s.amountPaid) > 0));
       setClients(allClients.filter(c => c.currentDebt > 0));
+      setCreditPayments(allPayments);
     } catch (err) {
       console.error("Error fetching credit data:", err);
     }
@@ -92,30 +95,73 @@ const CreditView: React.FC = () => {
       </div>
 
       {/* Vista de Tabla/Cards de Clientes Deudores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {clients.map(client => (
-          <div key={client.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black text-lg">
-                {client.name.charAt(0)}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+            <UserCircle size={18} className="text-blue-500" /> Clientes con Deuda
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {clients.map(client => (
+              <div key={client.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black text-lg">
+                    {client.name.charAt(0)}
+                  </div>
+                  <div>
+                    <span className="font-black text-slate-800 leading-tight block">{client.name}</span>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{client.phone || 'Sin contacto'}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Deuda Total</p>
+                  <span className="font-black text-rose-600 text-lg tracking-tight">${client.currentDebt.toLocaleString()}</span>
+                </div>
               </div>
-              <div>
-                <span className="font-black text-slate-800 leading-tight block">{client.name}</span>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{client.phone || 'Sin contacto'}</p>
+            ))}
+            {clients.length === 0 && (
+              <div className="col-span-full py-16 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-100">
+                <CreditCard className="mx-auto text-slate-100 mb-2" size={48} />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sin deudas pendientes</p>
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Deuda Total</p>
-              <span className="font-black text-rose-600 text-lg tracking-tight">${client.currentDebt.toLocaleString()}</span>
-            </div>
+            )}
           </div>
-        ))}
-        {clients.length === 0 && (
-          <div className="col-span-full py-16 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-100">
-            <CreditCard className="mx-auto text-slate-100 mb-2" size={48} />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sin deudas pendientes</p>
+        </div>
+
+        {/* Historial de Abonos Recientes */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+            <History size={18} className="text-emerald-500" /> Historial de Abonos
+          </h2>
+          <div className="bg-white border border-slate-200 rounded-[2rem] shadow-sm overflow-hidden flex flex-col max-h-[500px]">
+             <div className="overflow-y-auto hide-scrollbar p-4 space-y-3">
+                {creditPayments.map(payment => {
+                  const client = clients.find(c => c.id === payment.clientId);
+                  return (
+                    <div key={payment.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                       <div className="flex items-center gap-3">
+                          <div className="p-2 bg-white rounded-xl text-emerald-600 shadow-sm border border-slate-100">
+                             <DollarSign size={16} />
+                          </div>
+                          <div>
+                             <p className="text-xs font-black text-slate-800">{client?.name || 'Cliente'}</p>
+                             <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(payment.date).toLocaleDateString()}</p>
+                          </div>
+                       </div>
+                       <div className="text-right">
+                          <span className="font-black text-emerald-600 text-sm tracking-tight">+${payment.amount.toLocaleString()}</span>
+                       </div>
+                    </div>
+                  );
+                })}
+                {creditPayments.length === 0 && (
+                  <div className="py-12 text-center">
+                    <History className="mx-auto text-slate-100 mb-2" size={32} />
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">No hay abonos registrados</p>
+                  </div>
+                )}
+             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Modal de Abono - RE-DISEÑADO PARA MÓVIL (Compacto) */}
