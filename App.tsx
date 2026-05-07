@@ -50,7 +50,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('sales');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string, email: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -59,6 +59,7 @@ const App: React.FC = () => {
         .single();
       
       if (data) {
+        // Si ya existe, lo cargamos
         const newProfile: UserProfile = {
           id: data.id,
           businessName: data.business_name || 'Mi Negocio',
@@ -67,15 +68,40 @@ const App: React.FC = () => {
           subscriptionExpires: data.subscription_expires,
           isBanned: data.is_banned,
           alias: data.alias,
-          contactPhone: data.contact_phone
+          contactPhone: data.contact_phone,
+          lastPaymentRef: data.last_payment_ref
         };
         setProfile(newProfile);
         localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
       } else {
-        setProfile(null);
+        // Si no existe, lo creamos
+        const isSuperUser = email === ADMIN_EMAIL;
+        const newProfileData = {
+          id: userId,
+          email: email,
+          business_name: 'Mi Negocio',
+          is_banned: !isSuperUser // Los nuevos usuarios empiezan bloqueados, excepto el admin
+        };
+        
+        const { data: created, error: createError } = await supabase
+          .from('profiles')
+          .insert(newProfileData)
+          .select()
+          .single();
+
+        if (created) {
+          const newProfile: UserProfile = {
+            id: created.id,
+            businessName: created.business_name,
+            email: created.email,
+            isBanned: created.is_banned
+          };
+          setProfile(newProfile);
+          localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
+        }
       }
     } catch (err) {
-      console.error("Error fetching profile:", err);
+      console.error("Error fetching/creating profile:", err);
     } finally {
       setLoading(false);
     }
@@ -86,7 +112,7 @@ const App: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       if (session) {
-        await fetchProfile(session.user.id);
+        await fetchProfile(session.user.id, session.user.email!);
       } else {
         localStorage.removeItem('cajapro_profile');
         setProfile(null);
@@ -98,7 +124,7 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user.email!);
       } else {
         localStorage.removeItem('cajapro_profile');
         setProfile(null);
@@ -167,16 +193,35 @@ const App: React.FC = () => {
       );
     }
 
-    if (expired) {
+    if (expired && currentView !== 'settings') {
       return (
-        <div className="flex flex-col items-center justify-center p-12 text-center space-y-6">
-          <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-[2rem] flex items-center justify-center shadow-lg">
-            <Clock size={48} />
+        <div className="flex flex-col items-center justify-center p-12 text-center space-y-10 min-h-[70vh] animate-in fade-in zoom-in duration-500">
+          <div className="relative">
+            <div className="w-32 h-32 bg-amber-100 text-amber-600 rounded-[2.5rem] flex items-center justify-center shadow-lg">
+              <Clock size={64} />
+            </div>
+            <div className="absolute -top-2 -right-2 bg-rose-600 text-white p-2 rounded-full border-4 border-white shadow-lg">
+              <ShieldAlert size={20} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-3xl font-black text-slate-800">Suscripción Vencida</h2>
-            <p className="text-slate-500 max-w-md mx-auto">Tu periodo de acceso ha expirado el {new Date(profile.subscriptionExpires!).toLocaleDateString()}. Por favor renueva tu suscripción para continuar usando la plataforma.</p>
+          
+          <div className="space-y-4">
+            <h2 className="text-4xl font-black text-slate-800 tracking-tight uppercase italic">Suscripción Vencida</h2>
+            <div className="space-y-1">
+              <p className="text-slate-500 font-bold max-w-sm mx-auto">Tu periodo de acceso ha expirado el <span className="text-rose-600 font-black">{new Date(profile.subscriptionExpires!).toLocaleDateString()}</span>.</p>
+              <p className="text-slate-400 text-sm font-medium">Por favor renueva tu suscripción para continuar usando la plataforma.</p>
+            </div>
           </div>
+
+          <button 
+            onClick={() => setCurrentView('settings')}
+            className="group flex items-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-2xl hover:scale-105 active:scale-95"
+          >
+            <CreditCard size={20} className="group-hover:rotate-12 transition-transform" />
+            Renovar Ahora
+          </button>
+
+          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Podrás reportar tu pago en la sección de mantenimiento.</p>
         </div>
       );
     }

@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
-import { Product, Client, SaleItem, SaleStatus, Sale } from '../types';
-import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, ScanLine, UserPlus, Loader2, X, ChevronDown, Camera, Check } from 'lucide-react';
+import { Product, Client, SaleItem, SaleStatus, Sale, PaymentMethod } from '../types';
+import { fetchExchangeRate } from '../services/exchangeService';
+import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, ScanLine, UserPlus, Loader2, X, ChevronDown, Camera, Check, Landmark, Smartphone, Banknote } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 
 const SalesView: React.FC = () => {
@@ -13,12 +14,18 @@ const SalesView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [saleStatus, setSaleStatus] = useState<SaleStatus>(SaleStatus.COMPLETED);
-  const [amountPaid, setAmountPaid] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.EFECTIVO);
+  const [paymentRef, setPaymentRef] = useState('');
+  const [amountPaidMode, setAmountPaidMode] = useState<'USD' | 'VES'>('USD');
+  const [amountPaidStr, setAmountPaidStr] = useState<string>('');
+  const isTypingAmountPaid = useRef(false);
   const [isCartVisible, setIsCartVisible] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerLoading, setScannerLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
+  const [rate, setRate] = useState<number>(0);
+  const [showBs, setShowBs] = useState(false);
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastProcessedRef = useRef<number>(0);
@@ -26,9 +33,14 @@ const SalesView: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [p, c] = await Promise.all([dbService.getProducts(), dbService.getClients()]);
+        const [p, c, r] = await Promise.all([
+          dbService.getProducts(), 
+          dbService.getClients(),
+          fetchExchangeRate()
+        ]);
         setProducts(p);
         setClients(c);
+        setRate(r);
       } catch (err) {
         console.error("Error loading sales data:", err);
       }
@@ -155,6 +167,19 @@ const SalesView: React.FC = () => {
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), [cart]);
 
+  useEffect(() => {
+    if (isTypingAmountPaid.current) return;
+    const currentVal = Number(amountPaidStr || 0); // Not ideal because mountPaidStr is not the source of truth for the number
+    // We actually need a number state or derive from total
+  }, [amountPaidMode, rate]);
+
+  // Use a derived number value
+  const amountPaidInUSD = useMemo(() => {
+    if (!amountPaidStr) return 0;
+    const num = Number(amountPaidStr);
+    return amountPaidMode === 'USD' ? num : num / rate;
+  }, [amountPaidStr, amountPaidMode, rate]);
+
   const handleProcessSale = async () => {
     if (cart.length === 0 || processing) return;
     if (saleStatus === SaleStatus.CREDIT && !selectedClient) {
@@ -162,6 +187,9 @@ const SalesView: React.FC = () => {
       return;
     }
     setProcessing(true);
+    
+    const finalAmountPaidInUSD = saleStatus === SaleStatus.COMPLETED ? total : amountPaidInUSD;
+
     const sale: Partial<Sale> = {
       id: crypto.randomUUID(),
       clientId: selectedClient?.id,
@@ -169,19 +197,28 @@ const SalesView: React.FC = () => {
       total,
       date: new Date().toISOString(),
       status: saleStatus,
-      amountPaid: saleStatus === SaleStatus.CREDIT ? Number(amountPaid || 0) : total
+      amountPaid: finalAmountPaidInUSD
     };
+    
+    const initialPayment = {
+      amount: sale.amountPaid || 0,
+      method: paymentMethod,
+      reference: paymentMethod === PaymentMethod.PAGOMOVIL ? paymentRef : undefined
+    };
+
     try {
-      await dbService.createSale(sale);
+      await dbService.createSale(sale, initialPayment);
       setCart([]);
       setSelectedClient(null);
-      setAmountPaid('');
+      setAmountPaidStr('');
+      setPaymentRef('');
       setClientSearch('');
       setIsCartVisible(false);
       const updatedProducts = await dbService.getProducts();
       setProducts(updatedProducts);
       alert('¡Venta realizada!');
     } catch (err) {
+      console.error(err);
       alert("Error al procesar venta.");
     } finally {
       setProcessing(false);
@@ -223,6 +260,7 @@ const SalesView: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-black text-blue-600 text-lg">${p.price.toLocaleString()}</p>
+                      {rate > 0 && <p className="text-[10px] font-black text-slate-400">Bs. {(p.price * rate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>}
                       <p className="text-[9px] font-bold text-emerald-500 uppercase">Añadir +</p>
                     </div>
                   </button>
@@ -324,27 +362,132 @@ const SalesView: React.FC = () => {
             ))}
           </div>
 
-          <div className="space-y-4 pt-6 border-t border-slate-100 lg:border-white/10">
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setSaleStatus(SaleStatus.COMPLETED)}
-                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 text-white shadow-lg' : 'bg-transparent border border-slate-200 lg:border-white/10 text-slate-400'}`}
-              >
-                Contado
-              </button>
-              <button 
-                onClick={() => setSaleStatus(SaleStatus.CREDIT)}
-                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 text-white shadow-lg' : 'bg-transparent border border-slate-200 lg:border-white/10 text-slate-400'}`}
-              >
-                Crédito
-              </button>
-            </div>
-            {saleStatus === SaleStatus.CREDIT && (
-              <input type="number" placeholder="Monto abonado hoy..." className="w-full px-5 py-4 bg-slate-50 lg:bg-white/5 border border-slate-200 lg:border-white/10 rounded-2xl outline-none font-black text-slate-800 lg:text-white" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
-            )}
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setSaleStatus(SaleStatus.COMPLETED)}
+                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 text-white shadow-lg' : 'bg-transparent border border-slate-200 lg:border-white/10 text-slate-400'}`}
+                >
+                  Contado
+                </button>
+                <button 
+                  onClick={() => setSaleStatus(SaleStatus.CREDIT)}
+                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 text-white shadow-lg' : 'bg-transparent border border-slate-200 lg:border-white/10 text-slate-400'}`}
+                >
+                  Crédito
+                </button>
+              </div>
+
+              {/* Selección de Método de Pago */}
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 lg:text-white/40 uppercase tracking-widest ml-1">Método de Pago</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    onClick={() => setPaymentMethod(PaymentMethod.EFECTIVO)}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.EFECTIVO ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+                  >
+                    <Banknote size={20} />
+                    <span className="text-[8px] font-black mt-1 uppercase">Efectivo</span>
+                  </button>
+                  <button 
+                    onClick={() => setPaymentMethod(PaymentMethod.PUNTO)}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PUNTO ? 'bg-blue-500 border-blue-400 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+                  >
+                    <CreditCard size={20} />
+                    <span className="text-[8px] font-black mt-1 uppercase">Punto</span>
+                  </button>
+                  <button 
+                    onClick={() => setPaymentMethod(PaymentMethod.PAGOMOVIL)}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PAGOMOVIL ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+                  >
+                    <Smartphone size={20} />
+                    <span className="text-[8px] font-black mt-1 uppercase">Móvil</span>
+                  </button>
+                </div>
+              </div>
+
+              {paymentMethod === PaymentMethod.PAGOMOVIL && (
+                 <div className="animate-in slide-in-from-top-2">
+                   <input 
+                    type="text" 
+                    placeholder="Referencia PagoMóvil (Opcional)" 
+                    className="w-full px-5 py-4 bg-slate-50 lg:bg-white/5 border border-slate-200 lg:border-white/10 rounded-2xl outline-none font-black text-slate-800 lg:text-white" 
+                    value={paymentRef} 
+                    onChange={(e) => setPaymentRef(e.target.value)} 
+                  />
+                 </div>
+              )}
+
+              {saleStatus === SaleStatus.CREDIT && (
+                <div className="animate-in slide-in-from-top-2">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[9px] font-black text-slate-400 lg:text-white/40 uppercase tracking-widest">Abono Inicial</label>
+                    {rate > 0 && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                           const currentUSD = amountPaidInUSD;
+                           const newMode = amountPaidMode === 'USD' ? 'VES' : 'USD';
+                           setAmountPaidMode(newMode);
+                           if (newMode === 'VES') {
+                             setAmountPaidStr(currentUSD === 0 ? '' : (currentUSD * rate).toFixed(2));
+                           } else {
+                             setAmountPaidStr(currentUSD === 0 ? '' : currentUSD.toFixed(2));
+                           }
+                        }}
+                        className={`text-[8px] font-black uppercase flex items-center gap-1 transition-all ${amountPaidMode === 'USD' ? 'text-blue-400' : 'text-emerald-400'}`}
+                      >
+                         Modo: {amountPaidMode === 'USD' ? 'USD ($)' : 'VES (Bs.)'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      placeholder="0.00" 
+                      className={`w-full px-5 py-4 bg-slate-50 lg:bg-white/5 border border-slate-200 lg:border-white/10 rounded-2xl outline-none font-black transition-all ${amountPaidMode === 'USD' ? 'text-slate-800 lg:text-white' : 'text-emerald-400'}`} 
+                      value={amountPaidStr} 
+                      onFocus={() => isTypingAmountPaid.current = true}
+                      onBlur={() => isTypingAmountPaid.current = false}
+                      onChange={(e) => setAmountPaidStr(e.target.value)} 
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                       <p className={`text-[10px] font-black uppercase opacity-20 ${amountPaidMode === 'USD' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                         {amountPaidMode === 'USD' ? 'USD' : 'Bs.'}
+                       </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             <div className="flex items-center justify-between text-slate-800 lg:text-white px-2">
               <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Total a Pagar</span>
-              <span className="text-3xl font-black tracking-tighter">${total.toLocaleString()}</span>
+              <div className="flex flex-col items-end">
+                <span className="text-3xl font-black tracking-tighter">${total.toLocaleString()}</span>
+                {rate > 0 && (
+                  <div className="flex flex-col items-end">
+                    <button 
+                      onClick={() => setShowBs(!showBs)}
+                      className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors"
+                    >
+                      <Landmark size={12} /> {showBs ? 'Cerrar Bs' : 'Ver en Bs'}
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        const r = await fetchExchangeRate();
+                        setRate(r);
+                      }}
+                      className="text-[8px] font-black text-slate-500 uppercase tracking-tighter hover:text-slate-300 mt-1"
+                    >
+                      Actualizar Tasa
+                    </button>
+                    {showBs && (
+                      <span className="text-lg font-black text-emerald-400 animate-in slide-in-from-right-2">
+                        Bs. {(total * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <button 
               onClick={handleProcessSale}

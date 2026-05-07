@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign, Tag } from 'lucide-react';
+import { fetchExchangeRate } from '../services/exchangeService';
+import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign, Tag, Landmark } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
 const InventoryView: React.FC = () => {
@@ -16,6 +17,20 @@ const InventoryView: React.FC = () => {
   const [productForBarcode, setProductForBarcode] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  const [rate, setRate] = useState<number>(0);
+  const [bsInput, setBsInput] = useState<string>('');
+  const [isRateLoading, setIsRateLoading] = useState(false);
+  const [formPrice, setFormPrice] = useState<number>(0);
+  const [formTotalCostMode, setFormTotalCostMode] = useState<'USD' | 'BS'>('USD');
+  const [replenishTotalCostMode, setReplenishTotalCostMode] = useState<'USD' | 'BS'>('USD');
+  
+  // Local string states for inputs to allow smooth typing
+  const [formTotalCostStr, setFormTotalCostStr] = useState<string>('');
+  const [replenishTotalCostStr, setReplenishTotalCostStr] = useState<string>('');
+
+  // Refs to track if the user is currently typing in the total cost field
+  const isTypingFormTotal = useRef(false);
+  const isTypingReplenishTotal = useRef(false);
 
   // Estados para la calculadora del Formulario Principal
   const [formStock, setFormStock] = useState<number>(0);
@@ -39,8 +54,16 @@ const InventoryView: React.FC = () => {
     }
   };
 
+  const getRate = async () => {
+    setIsRateLoading(true);
+    const r = await fetchExchangeRate();
+    setRate(r);
+    setIsRateLoading(false);
+  };
+
   useEffect(() => {
     fetchProducts();
+    getRate();
   }, []);
 
   // Sincronizar estados al abrir el modal de edición
@@ -50,13 +73,36 @@ const InventoryView: React.FC = () => {
       setFormUnitCost(editingProduct.cost);
       setFormTotalCost(editingProduct.stock * editingProduct.cost);
       setFormBarcode(editingProduct.barcode || '');
+      setFormPrice(editingProduct.price);
+      setFormTotalCostStr(String(editingProduct.stock * editingProduct.cost));
     } else {
       setFormStock(0);
       setFormUnitCost(0);
       setFormTotalCost(0);
+      setFormTotalCostStr('');
       setFormBarcode('');
+      setFormPrice(0);
     }
   }, [editingProduct, isModalOpen]);
+
+  // Sync string state when switching modes or when USD total changes from other logic
+  useEffect(() => {
+    if (isTypingFormTotal.current) return;
+    if (formTotalCostMode === 'USD') {
+      setFormTotalCostStr(formTotalCost === 0 ? '' : formTotalCost.toString());
+    } else if (rate > 0) {
+      setFormTotalCostStr(formTotalCost === 0 ? '' : (formTotalCost * rate).toFixed(2));
+    }
+  }, [formTotalCostMode, formTotalCost, rate]);
+
+  useEffect(() => {
+    if (isTypingReplenishTotal.current) return;
+    if (replenishTotalCostMode === 'USD') {
+      setReplenishTotalCostStr(replenishTotalCost === 0 ? '' : replenishTotalCost.toString());
+    } else if (rate > 0) {
+      setReplenishTotalCostStr(replenishTotalCost === 0 ? '' : (replenishTotalCost * rate).toFixed(2));
+    }
+  }, [replenishTotalCostMode, replenishTotalCost, rate]);
 
   const generateSKU = () => {
     let newSKU = '';
@@ -366,7 +412,37 @@ const InventoryView: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Precio Venta al Público ($)</label>
-                    <input name="price" type="number" step="0.01" defaultValue={editingProduct?.price} required className="w-full px-6 py-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-black text-2xl text-blue-600" />
+                    <div className="flex flex-col">
+                       <div className="relative">
+                         <input 
+                           name="price" 
+                           id="price-input" 
+                           type="number" 
+                           step="0.01" 
+                           value={formPrice || ''} 
+                           onChange={(e) => setFormPrice(Number(e.target.value))}
+                           required 
+                           className="w-full px-6 py-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-black text-2xl text-blue-600" 
+                         />
+                         <div className="absolute right-6 top-1/2 -translate-y-1/2 text-blue-300 font-black">$</div>
+                       </div>
+                       {rate > 0 && formPrice > 0 && (
+                         <div className="ml-1 mt-1 flex items-center gap-1.5">
+                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-tight">Equivale a: <span className="text-emerald-600">Bs. {(formPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+                         </div>
+                       )}
+                    </div>
+                    {rate > 0 && <div className="flex justify-between items-center mt-1">
+                      <button 
+                        type="button" 
+                        onClick={getRate}
+                        className="text-[8px] font-black text-blue-400 uppercase tracking-tighter hover:text-blue-600 flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw size={10} className={isRateLoading ? 'animate-spin' : ''} /> Actualizar Tasa
+                      </button>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Tasa BCV: {rate.toLocaleString()} Bs/$</p>
+                    </div>}
                   </div>
                 </div>
 
@@ -388,13 +464,12 @@ const InventoryView: React.FC = () => {
                         className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-black text-slate-800" 
                       />
                     </div>
-                    
-                    <div className="space-y-1">
+                      <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Costo Unitario ($)</label>
                       <input 
                         type="number" 
                         step="0.01" 
-                        value={formUnitCost} 
+                        value={formUnitCost || ''} 
                         onChange={(e) => updateFormByUnitCost(Number(e.target.value))} 
                         required 
                         className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-black text-slate-800" 
@@ -406,15 +481,49 @@ const InventoryView: React.FC = () => {
                          <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:scale-110 transition-transform">
                             <ArrowUpRight size={40} />
                          </div>
-                         <label className="text-[9px] font-black text-white/50 uppercase tracking-widest block mb-1">Inversión Total en Stock ($)</label>
-                         <input 
-                          type="number" 
-                          step="0.01" 
-                          value={formTotalCost} 
-                          onChange={(e) => updateFormByTotalCost(Number(e.target.value))} 
-                          className="bg-transparent border-none outline-none font-black text-3xl w-full text-emerald-400" 
-                        />
-                         <p className="text-[8px] font-bold text-white/30 uppercase mt-2">Este valor recalcula el costo unitario basado en el stock</p>
+                         <div className="flex justify-between items-center mb-1 relative z-10">
+                           <label className="text-[9px] font-black text-white/50 uppercase tracking-widest block">Inversión Total en Stock</label>
+                           <button 
+                             type="button" 
+                             onClick={() => setFormTotalCostMode(prev => prev === 'USD' ? 'BS' : 'USD')}
+                             className="text-[8px] font-black bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-lg uppercase tracking-widest transition-colors flex items-center gap-1 active:scale-95"
+                           >
+                             <Landmark size={10} /> {formTotalCostMode === 'USD' ? 'Cambiar a Bs.' : 'Cambiar a $'}
+                           </button>
+                         </div>
+                         <div className="relative z-10 flex items-center">
+                           <input 
+                            type="number" 
+                            step="0.01" 
+                            value={formTotalCostStr} 
+                            onFocus={() => isTypingFormTotal.current = true}
+                            onBlur={() => {
+                              isTypingFormTotal.current = false;
+                              // Force a sync on blur to clean up formatting
+                              if (formTotalCostMode === 'USD') {
+                                setFormTotalCostStr(formTotalCost === 0 ? '' : formTotalCost.toString());
+                              } else if (rate > 0) {
+                                setFormTotalCostStr(formTotalCost === 0 ? '' : (formTotalCost * rate).toFixed(2));
+                              }
+                            }}
+                            onChange={(e) => {
+                              const strVal = e.target.value;
+                              setFormTotalCostStr(strVal);
+                              const numVal = Number(strVal);
+                              if (formTotalCostMode === 'BS') {
+                                updateFormByTotalCost(rate > 0 ? Number((numVal / rate).toFixed(2)) : 0);
+                              } else {
+                                updateFormByTotalCost(numVal);
+                              }
+                            }} 
+                            className="bg-transparent border-none outline-none font-black text-4xl w-full text-emerald-400 placeholder:text-emerald-900/30" 
+                            placeholder="0.00"
+                          />
+                           <span className={`text-2xl font-black absolute right-0 pointer-events-none transition-all duration-300 ${formTotalCostMode === 'USD' ? 'text-blue-500/20' : 'text-emerald-500/20'}`}>
+                             {formTotalCostMode === 'USD' ? 'USD' : 'Bs.'}
+                           </span>
+                         </div>
+                         <p className="text-[8px] font-bold text-white/30 uppercase mt-2 relative z-10">Este valor recalcula el costo unitario basado en el stock</p>
                        </div>
                     </div>
                   </div>
@@ -485,26 +594,78 @@ const InventoryView: React.FC = () => {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Costo Unitario de Compra ($)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  required 
-                  value={replenishUnitCost || ''} 
-                  onChange={(e) => updateReplenishByUnitCost(Number(e.target.value))} 
-                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-black text-xl" 
-                />
+                <div className="flex flex-col">
+                  <div className="relative flex-1">
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      required 
+                      value={replenishUnitCost || ''} 
+                      onChange={(e) => updateReplenishByUnitCost(Number(e.target.value))} 
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-black text-xl" 
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300">$</div>
+                  </div>
+                  {rate > 0 && replenishUnitCost > 0 && (
+                    <div className="ml-1 mt-1 flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">Equivale a: <span className="text-blue-600">Bs. {(replenishUnitCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+                    </div>
+                  )}
+                </div>
+                {rate > 0 && <div className="flex justify-between items-center mt-1">
+                  <button 
+                    type="button" 
+                    onClick={getRate}
+                    className="text-[8px] font-black text-blue-400 uppercase tracking-tighter hover:text-blue-600 flex items-center gap-1 transition-colors"
+                  >
+                    <RefreshCw size={10} className={isRateLoading ? 'animate-spin' : ''} /> Actualizar Tasa
+                  </button>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Tasa BCV: {rate.toLocaleString()} Bs/$</p>
+                </div>}
               </div>
               <div className="bg-slate-900 rounded-2xl p-5 text-white">
-                 <p className="text-[8px] font-black uppercase opacity-50 tracking-widest mb-1">Monto de Inversión (Total)</p>
-                 <div className="flex items-center">
-                   <span className="text-2xl font-black text-white mr-1">$</span>
+                 <div className="flex justify-between items-center mb-1">
+                   <p className="text-[8px] font-black uppercase opacity-50 tracking-widest">Monto de Inversión (Total)</p>
+                   <button 
+                     type="button" 
+                     onClick={() => setReplenishTotalCostMode(prev => prev === 'USD' ? 'BS' : 'USD')}
+                     className="text-[7px] font-black bg-white/10 hover:bg-white/20 text-white/70 px-2 py-1 rounded-md uppercase tracking-widest transition-colors flex items-center gap-1"
+                   >
+                     <Landmark size={8} /> {replenishTotalCostMode === 'USD' ? 'Cambiar a Bs.' : 'Cambiar a $'}
+                   </button>
+                 </div>
+                 <div className="flex items-center relative">
                    <input 
                     type="number" 
                     step="0.01" 
-                    value={replenishTotalCost || ''} 
-                    onChange={(e) => updateReplenishByTotalCost(Number(e.target.value))} 
-                    className="bg-transparent border-none outline-none text-2xl font-black text-emerald-400 w-full" 
+                    value={replenishTotalCostStr} 
+                    onFocus={() => isTypingReplenishTotal.current = true}
+                    onBlur={() => {
+                      isTypingReplenishTotal.current = false;
+                      // Force a sync on blur to clean up formatting
+                      if (replenishTotalCostMode === 'USD') {
+                        setReplenishTotalCostStr(replenishTotalCost === 0 ? '' : replenishTotalCost.toString());
+                      } else if (rate > 0) {
+                        setReplenishTotalCostStr(replenishTotalCost === 0 ? '' : (replenishTotalCost * rate).toFixed(2));
+                      }
+                    }}
+                    onChange={(e) => {
+                      const strVal = e.target.value;
+                      setReplenishTotalCostStr(strVal);
+                      const numVal = Number(strVal);
+                      if (replenishTotalCostMode === 'BS') {
+                        updateReplenishByTotalCost(rate > 0 ? Number((numVal / rate).toFixed(2)) : 0);
+                      } else {
+                        updateReplenishByTotalCost(numVal);
+                      }
+                    }} 
+                    className="bg-transparent border-none outline-none text-3xl font-black text-emerald-400 w-full placeholder:text-emerald-900/30" 
+                    placeholder="0.00"
                   />
+                  <span className={`text-xl font-black absolute right-0 pointer-events-none transition-all duration-300 ${replenishTotalCostMode === 'USD' ? 'text-blue-500/20' : 'text-emerald-500/20'}`}>
+                    {replenishTotalCostMode === 'USD' ? 'USD' : 'Bs.'}
+                  </span>
                  </div>
               </div>
             </div>

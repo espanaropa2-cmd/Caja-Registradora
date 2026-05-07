@@ -1,29 +1,44 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { dbService } from '../services/dbService';
-import { SaleStatus, Sale, Client, CreditPayment } from '../types';
-import { CreditCard, AlertCircle, RefreshCw, Loader2, DollarSign, CheckCircle2, Circle, Calendar, Hash, UserCircle, X, ChevronRight, History } from 'lucide-react';
+import { SaleStatus, Sale, Client, CreditPayment, PaymentMethod } from '../types';
+import { CreditCard, AlertCircle, RefreshCw, Loader2, DollarSign, CheckCircle2, Circle, Calendar, Hash, UserCircle, X, ChevronRight, History, Smartphone, Banknote } from 'lucide-react';
 
 const CreditView: React.FC = () => {
+  const [allClientsForLookup, setAllClientsForLookup] = useState<Client[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [creditPayments, setCreditPayments] = useState<CreditPayment[]>([]);
   const [isAbonoOpen, setIsAbonoOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set());
-  const [abonoAmount, setAbonoAmount] = useState<number>(0);
+  const [abonoAmountStr, setAbonoAmountStr] = useState<string>('');
+  const [abonoAmountMode, setAbonoAmountMode] = useState<'USD' | 'VES'>('USD');
+  const isTypingAbono = useRef(false);
+  const [rate, setRate] = useState<number>(0);
+  const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>(PaymentMethod.EFECTIVO);
+  const [abonoRef, setAbonoRef] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Derived in-memory value in USD for processing
+  const abonoAmountInUSD = useMemo(() => {
+    const num = Number(abonoAmountStr || 0);
+    return abonoAmountMode === 'USD' ? num : num / rate;
+  }, [abonoAmountStr, abonoAmountMode, rate]);
 
   const fetchData = async () => {
     try {
-      const [allSales, allClients, allPayments] = await Promise.all([
+      const [allSales, allClients, allPayments, currentRate] = await Promise.all([
         dbService.getSales(),
         dbService.getClients(),
-        dbService.getCreditPayments()
+        dbService.getCreditPayments(),
+        import('../services/exchangeService').then(m => m.fetchExchangeRate())
       ]);
       setSales(allSales.filter(s => s.status === SaleStatus.CREDIT && (s.total - s.amountPaid) > 0));
+      setAllClientsForLookup(allClients); // Guardar todos para búsqueda de nombres
       setClients(allClients.filter(c => c.currentDebt > 0));
       setCreditPayments(allPayments);
+      setRate(currentRate);
     } catch (err) {
       console.error("Error fetching credit data:", err);
     }
@@ -35,20 +50,22 @@ const CreditView: React.FC = () => {
 
   const handleRegisterAbono = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedClient || selectedSaleIds.size === 0 || abonoAmount <= 0) return;
+    if (!selectedClient || selectedSaleIds.size === 0 || abonoAmountInUSD <= 0) return;
     
     setLoading(true);
     try {
       await dbService.processDistributedAbono(
         selectedClient.id, 
-        abonoAmount, 
-        Array.from(selectedSaleIds)
+        abonoAmountInUSD, 
+        Array.from(selectedSaleIds),
+        { method: abonoMethod, reference: abonoMethod === PaymentMethod.PAGOMOVIL ? abonoRef : undefined }
       );
       await fetchData();
       setIsAbonoOpen(false);
       resetModal();
       alert('Abono procesado con éxito.');
     } catch (err) {
+      console.error(err);
       alert('Error al procesar el abono.');
     } finally {
       setLoading(false);
@@ -58,7 +75,10 @@ const CreditView: React.FC = () => {
   const resetModal = () => {
     setSelectedClient(null);
     setSelectedSaleIds(new Set());
-    setAbonoAmount(0);
+    setAbonoAmountStr('');
+    setAbonoAmountMode('USD');
+    setAbonoMethod(PaymentMethod.EFECTIVO);
+    setAbonoRef('');
   };
 
   const toggleSaleSelection = (id: string) => {
@@ -135,7 +155,7 @@ const CreditView: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-[2rem] shadow-sm overflow-hidden flex flex-col max-h-[500px]">
              <div className="overflow-y-auto hide-scrollbar p-4 space-y-3">
                 {creditPayments.map(payment => {
-                  const client = clients.find(c => c.id === payment.clientId);
+                  const client = allClientsForLookup.find(c => c.id === payment.clientId);
                   return (
                     <div key={payment.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
                        <div className="flex items-center gap-3">
@@ -144,7 +164,13 @@ const CreditView: React.FC = () => {
                           </div>
                           <div>
                              <p className="text-xs font-black text-slate-800">{client?.name || 'Cliente'}</p>
-                             <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(payment.date).toLocaleDateString()}</p>
+                             <div className="flex items-center gap-2">
+                               <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(payment.date).toLocaleDateString()}</p>
+                               <span className="text-[8px] font-black bg-slate-200 px-1.5 py-0.5 rounded text-slate-500 uppercase tracking-tighter">
+                                 {payment.method}
+                                 {payment.reference ? ` (${payment.reference})` : ''}
+                               </span>
+                             </div>
                           </div>
                        </div>
                        <div className="text-right">
@@ -201,24 +227,96 @@ const CreditView: React.FC = () => {
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Monto Abono ($)</label>
-                  <input 
-                    name="amount" 
-                    type="number" 
-                    step="0.01" 
-                    required 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-black text-lg text-emerald-600 focus:ring-2 focus:ring-emerald-500" 
-                    placeholder="0.00"
-                    value={abonoAmount || ''}
-                    onChange={(e) => setAbonoAmount(Number(e.target.value))}
-                  />
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">2. Monto Abono</label>
+                    {rate > 0 && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                           const currentUSD = abonoAmountInUSD;
+                           const newMode = abonoAmountMode === 'USD' ? 'VES' : 'USD';
+                           setAbonoAmountMode(newMode);
+                           if (newMode === 'VES') {
+                             setAbonoAmountStr(currentUSD === 0 ? '' : (currentUSD * rate).toFixed(2));
+                           } else {
+                             setAbonoAmountStr(currentUSD === 0 ? '' : currentUSD.toFixed(2));
+                           }
+                        }}
+                        className={`text-[8.5px] font-black uppercase flex items-center gap-1 transition-all ${abonoAmountMode === 'USD' ? 'text-blue-600' : 'text-emerald-600'}`}
+                      >
+                         Modo: {abonoAmountMode === 'USD' ? 'USD ($)' : 'VES (Bs.)'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      name="amount" 
+                      type="number" 
+                      step="0.01" 
+                      required 
+                      className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-black text-lg transition-all focus:ring-2 ${abonoAmountMode === 'USD' ? 'text-slate-800 focus:ring-blue-500' : 'text-emerald-600 focus:ring-emerald-500'}`} 
+                      placeholder="0.00"
+                      value={abonoAmountStr}
+                      onFocus={() => isTypingAbono.current = true}
+                      onBlur={() => isTypingAbono.current = false}
+                      onChange={(e) => setAbonoAmountStr(e.target.value)}
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                       <p className={`text-[10px] font-black uppercase opacity-20 ${abonoAmountMode === 'USD' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                         {abonoAmountMode === 'USD' ? 'USD' : 'Bs.'}
+                       </p>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Método de Pago para Abono */}
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Método de Pago</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setAbonoMethod(PaymentMethod.EFECTIVO)}
+                    className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${abonoMethod === PaymentMethod.EFECTIVO ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                  >
+                    <Banknote size={18} />
+                    <span className="text-[8px] font-black mt-1 uppercase">Efectivo</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setAbonoMethod(PaymentMethod.PUNTO)}
+                    className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${abonoMethod === PaymentMethod.PUNTO ? 'bg-blue-500 border-blue-400 text-white' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                  >
+                    <CreditCard size={18} />
+                    <span className="text-[8px] font-black mt-1 uppercase">Punto</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setAbonoMethod(PaymentMethod.PAGOMOVIL)}
+                    className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${abonoMethod === PaymentMethod.PAGOMOVIL ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                  >
+                    <Smartphone size={18} />
+                    <span className="text-[8px] font-black mt-1 uppercase">Móvil</span>
+                  </button>
+                </div>
+              </div>
+
+              {abonoMethod === PaymentMethod.PAGOMOVIL && (
+                 <div className="animate-in slide-in-from-top-2">
+                   <input 
+                    type="text" 
+                    placeholder="Referencia PagoMóvil (Opcional)" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-black text-sm text-slate-800" 
+                    value={abonoRef} 
+                    onChange={(e) => setAbonoRef(e.target.value)} 
+                  />
+                 </div>
+              )}
 
               {selectedClient && (
                 <div className="space-y-2 flex-1 flex flex-col overflow-hidden">
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">3. Aplicar a Facturas</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">4. Aplicar a Facturas</label>
                     <span className="text-[9px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded-md">
                       {selectedSaleIds.size} seleccionada(s)
                     </span>
@@ -263,7 +361,7 @@ const CreditView: React.FC = () => {
                   </div>
                 </div>
               )}
-
+              
               {/* Pie de Modal Compacto */}
               <div className="bg-slate-900 rounded-2xl p-4 text-white space-y-1">
                 <div className="flex justify-between items-center opacity-50">
@@ -273,13 +371,13 @@ const CreditView: React.FC = () => {
                 <div className="flex justify-between items-center">
                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Restante estimado</span>
                    <span className="text-xl font-black text-emerald-400">
-                     ${Math.max(0, totalOwedBySelection - abonoAmount).toLocaleString()}
+                     ${Math.max(0, totalOwedBySelection - abonoAmountInUSD).toLocaleString()}
                    </span>
-                </div>
+                 </div>
               </div>
 
               <button 
-                disabled={loading || !selectedClient || selectedSaleIds.size === 0 || abonoAmount <= 0} 
+                disabled={loading || !selectedClient || selectedSaleIds.size === 0 || abonoAmountInUSD <= 0} 
                 type="submit" 
                 className="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-base shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-30 uppercase tracking-widest"
               >

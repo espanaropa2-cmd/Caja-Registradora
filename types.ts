@@ -1,4 +1,22 @@
 
+export enum SubscriptionStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  DECLINED = 'DECLINED'
+}
+
+export interface SubscriptionRequest {
+  id: string;
+  userId: string;
+  businessName: string;
+  months: number;
+  amountUsd: number;
+  method: string;
+  reference: string;
+  status: SubscriptionStatus;
+  date: string;
+}
+
 export interface UserProfile {
   id: string;
   businessName: string;
@@ -8,6 +26,17 @@ export interface UserProfile {
   isBanned?: boolean;
   alias?: string;
   contactPhone?: string;
+  lastPaymentRef?: string;
+  archived?: boolean;
+}
+
+export interface AppConfig {
+  id: 'global';
+  bankName: string;
+  accountNumber: string;
+  phone: string;
+  idNumber: string;
+  binanceUser: string;
 }
 
 export interface Product {
@@ -43,6 +72,12 @@ export enum SaleStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export enum PaymentMethod {
+  PUNTO = 'PUNTO',
+  PAGOMOVIL = 'PAGOMOVIL',
+  EFECTIVO = 'EFECTIVO'
+}
+
 export interface Sale {
   id: string;
   userId: string;
@@ -52,14 +87,21 @@ export interface Sale {
   date: string;
   status: SaleStatus;
   amountPaid: number;
+  payments?: SalePayment[];
 }
 
-export interface CreditPayment {
+export interface SalePayment {
   id: string;
+  saleId: string;
   clientId: string;
-  saleId?: string;
   amount: number;
+  method: PaymentMethod;
+  reference?: string;
   date: string;
+}
+
+export interface CreditPayment extends SalePayment {
+  // Keeping this for compatibility or simpler overall tracking
 }
 
 export type ExpenseCategory = 'Reabastecimiento' | 'Otros';

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/dbService';
 import { Sale, Client } from '../types';
-import { History, Calendar, Search, Trash2, ArrowUpRight, ShoppingBag, User, Loader2, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import { History, Calendar, Search, Trash2, ArrowUpRight, ShoppingBag, User, Loader2, X, AlertTriangle, RefreshCw, DollarSign } from 'lucide-react';
 
 type TimeRange = 'hoy' | 'semana' | 'mes' | 'año' | 'todos';
 
@@ -97,7 +97,7 @@ const SalesHistoryView: React.FC = () => {
   };
 
   const getClientName = (id?: string) => {
-    if (!id) return 'Venta de Contado';
+    if (!id) return 'Venta Pagada';
     return clients.find(c => c.id === id)?.name || 'Desconocido';
   };
 
@@ -192,7 +192,7 @@ const SalesHistoryView: React.FC = () => {
                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
                       sale.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                     }`}>
-                      {sale.status === 'COMPLETED' ? 'CONTADO' : 'CRÉDITO'}
+                      {sale.status === 'COMPLETED' ? 'PAGADO' : 'CRÉDITO'}
                     </span>
                   </td>
                   <td className="px-8 py-6 text-center">
@@ -328,7 +328,7 @@ const SalesHistoryView: React.FC = () => {
                   <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
                     selectedSale.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {selectedSale.status === 'COMPLETED' ? 'Venta de Contado' : 'Venta al Crédito'}
+                    {selectedSale.status === 'COMPLETED' ? 'PAGADA' : 'CRÉDITO'}
                   </span>
                 </div>
               </div>
@@ -375,7 +375,7 @@ const SalesHistoryView: React.FC = () => {
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-600">
                       <RefreshCw size={64} />
                     </div>
-                    <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Abono Inicial / Pagado</p>
+                    <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Pagado hasta hoy</p>
                     <p className="text-4xl font-black text-emerald-600">${selectedSale.amountPaid.toLocaleString()}</p>
                     <div className="mt-4 pt-4 border-t border-emerald-200/50">
                       <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Saldo Pendiente</p>
@@ -384,6 +384,36 @@ const SalesHistoryView: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Historial de Pagos / Abonos */}
+              {selectedSale.payments && selectedSale.payments.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Historial de Pagos</h4>
+                  <div className="bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden">
+                    <div className="p-4 space-y-3">
+                      {selectedSale.payments.map((payment, idx) => (
+                        <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center shadow-inner">
+                              <DollarSign size={18} />
+                            </div>
+                            <div>
+                               <p className="text-xs font-black text-slate-800 uppercase space-x-2">
+                                 <span>{payment.method}</span>
+                                 {payment.reference && <span className="text-slate-400 font-bold ml-2">#{payment.reference}</span>}
+                               </p>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{new Date(payment.date).toLocaleString()}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                             <p className="text-lg font-black text-emerald-600">+${payment.amount.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">

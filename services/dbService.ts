@@ -1,6 +1,6 @@
 
 import { supabase } from '../supabaseClient';
-import { Product, Client, Sale, Expense, SaleStatus, ExpenseCategory, CreditPayment } from '../types';
+import { Product, Client, Sale, Expense, SaleStatus, ExpenseCategory, CreditPayment, AppConfig, UserProfile, SubscriptionRequest, SubscriptionStatus } from '../types';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -124,7 +124,10 @@ export const dbService = {
     if (error) throw error;
     
     return (data || [])
-      .filter(e => !(e.description || '').startsWith(ABONO_PREFIX)) // Filter out abonos from expenses view
+      .filter(e => {
+        const desc = e.description || '';
+        return !desc.startsWith(ABONO_PREFIX) && !desc.startsWith('⚙️ [CONFIG]');
+      })
       .map(e => {
         let category: ExpenseCategory = 'Otros';
         let cleanDescription = e.description || '';
@@ -215,14 +218,35 @@ export const dbService = {
   },
 
   async getSales(): Promise<Sale[]> {
-    const { data, error } = await supabase.from('sales').select('*').order('date', { ascending: false });
+    const { data: sales, error } = await supabase.from('sales').select('*').order('date', { ascending: false });
     if (error) throw error;
-    return (data || []).map(s => ({
-      id: s.id, userId: s.user_id, clientId: s.client_id, items: s.items || [], total: s.total, date: s.date, status: s.status, amountPaid: s.amount_paid
+    
+    const { data: payments } = await supabase.from('sale_payments').select('*');
+    
+    return (sales || []).map(s => ({
+      id: s.id, 
+      userId: s.user_id, 
+      clientId: s.client_id, 
+      items: s.items || [], 
+      total: s.total, 
+      date: s.date, 
+      status: s.status, 
+      amountPaid: s.amount_paid,
+      payments: (payments || [])
+        .filter(p => p.sale_id === s.id)
+        .map(p => ({
+          id: p.id,
+          saleId: p.sale_id,
+          clientId: p.client_id,
+          amount: p.amount,
+          method: p.method,
+          reference: p.reference,
+          date: p.date
+        }))
     }));
   },
 
-  async createSale(sale: Partial<Sale>) {
+  async createSale(sale: Partial<Sale>, initialPayment?: { amount: number, method: string, reference?: string }) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: newSale, error: saleError } = await supabase
       .from('sales')
@@ -238,6 +262,20 @@ export const dbService = {
       .select().single();
 
     if (saleError) throw saleError;
+    
+    // Registrar el pago inicial si existe
+    if (initialPayment && initialPayment.amount > 0) {
+      await supabase.from('sale_payments').insert({
+        sale_id: newSale.id,
+        client_id: sale.clientId,
+        amount: initialPayment.amount,
+        method: initialPayment.method,
+        reference: initialPayment.reference,
+        user_id: user?.id,
+        date: new Date().toISOString()
+      });
+    }
+
     for (const item of sale.items || []) {
       const { data: prod } = await supabase.from('products').select('stock').eq('id', item.productId).single();
       if (prod) await supabase.from('products').update({ stock: prod.stock - item.quantity }).eq('id', item.productId);
@@ -282,51 +320,78 @@ export const dbService = {
     if (deleteError) throw deleteError;
   },
 
-  async processDistributedAbono(clientId: string, totalAmount: number, saleIds: string[]) {
+  async processDistributedAbono(clientId: string, totalAmount: number, saleIds: string[], paymentDetails: { method: string, reference?: string }) {
+    const { data: { user } } = await supabase.auth.getUser();
     const { data: sales } = await supabase.from('sales').select('*').in('id', saleIds).order('date', { ascending: true });
     let remaining = totalAmount;
     for (const sale of sales || []) {
       if (remaining <= 0) break;
       const pending = sale.total - sale.amount_paid;
       const applied = Math.min(remaining, pending);
-      await supabase.from('sales').update({ amount_paid: sale.amount_paid + applied, status: (sale.amount_paid + applied >= sale.total ? SaleStatus.COMPLETED : SaleStatus.CREDIT) }).eq('id', sale.id);
+      
+      // Actualizar venta
+      await supabase.from('sales').update({ 
+        amount_paid: sale.amount_paid + applied, 
+        status: (sale.amount_paid + applied >= sale.total ? SaleStatus.COMPLETED : SaleStatus.CREDIT) 
+      }).eq('id', sale.id);
+
+      // Guardar pago detallado
+      await supabase.from('sale_payments').insert({
+        sale_id: sale.id,
+        client_id: clientId,
+        amount: applied,
+        method: paymentDetails.method,
+        reference: paymentDetails.reference,
+        user_id: user?.id,
+        date: new Date().toISOString()
+      });
+
       remaining -= applied;
     }
     const { data: client } = await supabase.from('clients').select('current_debt').eq('id', clientId).single();
     if (client) await supabase.from('clients').update({ current_debt: Math.max(0, client.current_debt - totalAmount) }).eq('id', clientId);
-    
-    // Registrar el abono en el historial
-    await this.addCreditPayment({
-      clientId: clientId,
-      amount: totalAmount,
-      date: new Date().toISOString()
-    });
   },
 
-  // Abonos (Credit Payments) using expenses table as fallback storage
-  async getCreditPayments(clientId?: string): Promise<CreditPayment[]> {
+  async getSalePaymentsByClient(clientId: string): Promise<CreditPayment[]> {
     const { data, error } = await supabase
-      .from('expenses')
+      .from('sale_payments')
       .select('*')
-      .filter('description', 'ilike', `${ABONO_PREFIX}%`)
+      .eq('client_id', clientId)
       .order('date', { ascending: false });
     
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      saleId: p.sale_id,
+      clientId: p.client_id,
+      amount: p.amount,
+      method: p.method,
+      reference: p.reference,
+      date: p.date
+    }));
+  },
+
+  async getCreditPayments(clientId?: string): Promise<CreditPayment[]> {
+    let query = supabase.from('sale_payments').select('*').order('date', { ascending: false });
+    if (clientId) {
+      query = query.eq('client_id', clientId);
+    }
+    const { data, error } = await query;
     if (error) {
-      console.warn("Could not fetch credit payments from expenses:", error);
-      return [];
+       // Fallback logic from previous implementation if needed, but we prefer the new table
+       console.warn("Could not fetch sale_payments table, trying fallback info");
+       return [];
     }
 
-    return (data || []).map(p => {
-      const parts = p.description.replace(ABONO_PREFIX, '').split('|');
-      const cid = parts[1] || '';
-      return {
-        id: p.id,
-        saleId: parts[2] || '',
-        amount: p.amount,
-        date: p.date,
-        clientId: cid
-      };
-    }).filter(p => !clientId || p.clientId === clientId);
+    return (data || []).map(p => ({
+      id: p.id,
+      saleId: p.sale_id,
+      clientId: p.client_id,
+      amount: p.amount,
+      method: p.method,
+      reference: p.reference,
+      date: p.date
+    }));
   },
 
   async addCreditPayment(payment: { clientId: string, amount: number, date: string }) {
@@ -363,8 +428,15 @@ export const dbService = {
       subscriptionExpires: p.subscription_expires,
       isBanned: p.is_banned,
       alias: p.alias,
-      contactPhone: p.contact_phone
+      contactPhone: p.contact_phone,
+      lastPaymentRef: p.last_payment_ref,
+      archived: p.archived
     }));
+  },
+
+  async toggleArchiveUserProfile(userId: string, archived: boolean) {
+    const { error } = await supabase.from('profiles').update({ archived }).eq('id', userId);
+    if (error) throw error;
   },
 
   async updateProfileByAdmin(profileId: string, updates: Partial<UserProfile>) {
@@ -375,8 +447,142 @@ export const dbService = {
     if (updates.isBanned !== undefined) dbUpdates.is_banned = updates.isBanned;
     if (updates.alias !== undefined) dbUpdates.alias = updates.alias;
     if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
+    if (updates.lastPaymentRef !== undefined) dbUpdates.last_payment_ref = updates.lastPaymentRef;
+    if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', profileId);
     if (error) throw error;
-  }
+  },
+
+  // App Config with fallback to expenses table
+  async getAppConfig(): Promise<AppConfig> {
+    try {
+      const { data, error } = await supabase.from('app_config').select('*').eq('id', 'global').single();
+      if (!error && data) return data;
+    } catch (e) {
+      console.warn("app_config table missing, trying expenses fallback");
+    }
+
+    // Fallback: search in expenses
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .filter('description', 'ilike', '⚙️ [CONFIG]%')
+      .order('date', { ascending: false })
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      const parts = data[0].description.replace('⚙️ [CONFIG] ', '').split('|');
+      return {
+        id: 'global',
+        bankName: parts[0] || '',
+        accountNumber: parts[1] || '',
+        phone: parts[2] || '',
+        idNumber: parts[3] || '',
+        binanceUser: parts[4] || ''
+      };
+    }
+
+    return {
+      id: 'global',
+      bankName: '',
+      accountNumber: '',
+      phone: '',
+      idNumber: '',
+      binanceUser: ''
+    };
+  },
+
+  async saveAppConfig(config: AppConfig) {
+    // Try app_config first
+    try {
+      const { error } = await supabase.from('app_config').upsert(config);
+      if (!error) return;
+    } catch (e) {
+      // ignore table missing
+    }
+
+    // Fallback: save as a special expense
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No autenticado");
+
+    const description = `⚙️ [CONFIG] ${config.bankName}|${config.accountNumber}|${config.phone}|${config.idNumber}|${config.binanceUser}`;
+    
+    const { error } = await supabase.from('expenses').insert({
+      id: generateUUID(),
+      description: description,
+      amount: 0,
+      date: new Date().toISOString(),
+      user_id: user.id
+    });
+
+    if (error) throw error;
+  },
+
+  async createSubscriptionRequest(request: Partial<SubscriptionRequest>) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No autenticado");
+
+    const { error } = await supabase.from('subscription_requests').insert({
+      id: generateUUID(),
+      user_id: user.id,
+      business_name: request.businessName,
+      months: request.months,
+      amount_usd: request.amountUsd,
+      method: request.method,
+      reference: request.reference,
+      status: SubscriptionStatus.PENDING,
+      date: new Date().toISOString()
+    });
+    if (error) throw error;
+  },
+
+  async getSubscriptionRequests(): Promise<SubscriptionRequest[]> {
+    const { data, error } = await supabase
+      .from('subscription_requests')
+      .select('*')
+      .order('date', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(r => ({
+      id: r.id,
+      userId: r.user_id,
+      businessName: r.business_name,
+      months: r.months,
+      amountUsd: r.amount_usd,
+      method: r.method,
+      reference: r.reference,
+      status: r.status,
+      date: r.date
+    }));
+  },
+
+  async updateSubscriptionRequestStatus(requestId: string, status: SubscriptionStatus) {
+    const { data: req, error: fetchErr } = await supabase.from('subscription_requests').select('*').eq('id', requestId).single();
+    if (fetchErr) throw fetchErr;
+
+    if (status === SubscriptionStatus.CONFIRMED) {
+      // 1. Obtener perfil
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', req.user_id).single();
+      
+      // 2. Calcular nueva fecha
+      const baseDate = (profile.subscription_expires && new Date(profile.subscription_expires) > new Date()) 
+        ? new Date(profile.subscription_expires) 
+        : new Date();
+      
+      const newDate = new Date(baseDate);
+      newDate.setMonth(newDate.getMonth() + req.months);
+      newDate.setHours(23, 59, 59, 999);
+
+      // 3. Actualizar perfil
+      await supabase.from('profiles').update({
+        subscription_expires: newDate.toISOString(),
+        last_payment_ref: req.reference
+      }).eq('id', req.user_id);
+    }
+
+    // 4. Actualizar estado de solicitud
+    const { error } = await supabase.from('subscription_requests').update({ status }).eq('id', requestId);
+    if (error) throw error;
+  },
 };
