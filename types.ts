@@ -28,6 +28,7 @@ export interface UserProfile {
   contactPhone?: string;
   lastPaymentRef?: string;
   archived?: boolean;
+  role?: 'admin' | 'user';
 }
 
 export interface AppConfig {

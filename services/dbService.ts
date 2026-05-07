@@ -430,7 +430,8 @@ export const dbService = {
       alias: p.alias,
       contactPhone: p.contact_phone,
       lastPaymentRef: p.last_payment_ref,
-      archived: p.archived
+      archived: p.archived,
+      role: p.role || 'user'
     }));
   },
 
@@ -458,9 +459,18 @@ export const dbService = {
   async getAppConfig(): Promise<AppConfig> {
     try {
       const { data, error } = await supabase.from('app_config').select('*').eq('id', 'global').single();
-      if (!error && data) return data;
+      if (!error && data) {
+        return {
+          id: 'global',
+          bankName: data.bank_name || '',
+          accountNumber: data.account_number || '',
+          phone: data.phone || '',
+          idNumber: data.id_number || '',
+          binanceUser: data.binance_user || ''
+        };
+      }
     } catch (e) {
-      console.warn("app_config table missing, trying expenses fallback");
+      console.warn("app_config table missing or mapping error, trying expenses fallback");
     }
 
     // Fallback: search in expenses
@@ -496,7 +506,15 @@ export const dbService = {
   async saveAppConfig(config: AppConfig) {
     // Try app_config first
     try {
-      const { error } = await supabase.from('app_config').upsert(config);
+      const dbConfig = {
+        id: 'global',
+        bank_name: config.bankName,
+        account_number: config.accountNumber,
+        phone: config.phone,
+        id_number: config.idNumber,
+        binance_user: config.binanceUser
+      };
+      const { error } = await supabase.from('app_config').upsert(dbConfig);
       if (!error) return;
     } catch (e) {
       // ignore table missing
@@ -561,28 +579,34 @@ export const dbService = {
     const { data: req, error: fetchErr } = await supabase.from('subscription_requests').select('*').eq('id', requestId).single();
     if (fetchErr) throw fetchErr;
 
-    if (status === SubscriptionStatus.CONFIRMED) {
+    if (status === SubscriptionStatus.CONFIRMED && req.status !== SubscriptionStatus.CONFIRMED) {
       // 1. Obtener perfil
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', req.user_id).single();
+      const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', req.user_id).single();
+      if (profileErr) throw new Error("No se pudo encontrar el perfil del usuario: " + profileErr.message);
       
       // 2. Calcular nueva fecha
-      const baseDate = (profile.subscription_expires && new Date(profile.subscription_expires) > new Date()) 
-        ? new Date(profile.subscription_expires) 
-        : new Date();
+      const now = new Date();
+      const currentExpiry = profile.subscription_expires ? new Date(profile.subscription_expires) : null;
       
+      // Si ya tiene una fecha y no ha vencido, sumamos a esa. Si no, sumamos desde hoy.
+      const baseDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
+      
+      const monthsToAdd = Number(req.months) || 0;
       const newDate = new Date(baseDate);
-      newDate.setMonth(newDate.getMonth() + req.months);
+      newDate.setMonth(newDate.getMonth() + monthsToAdd);
       newDate.setHours(23, 59, 59, 999);
 
       // 3. Actualizar perfil
-      await supabase.from('profiles').update({
+      const { error: updateProfileErr } = await supabase.from('profiles').update({
         subscription_expires: newDate.toISOString(),
         last_payment_ref: req.reference
       }).eq('id', req.user_id);
+
+      if (updateProfileErr) throw new Error("Error al actualizar la suscripción del negocio: " + updateProfileErr.message);
     }
 
     // 4. Actualizar estado de solicitud
-    const { error } = await supabase.from('subscription_requests').update({ status }).eq('id', requestId);
-    if (error) throw error;
+    const { error: updateReqErr } = await supabase.from('subscription_requests').update({ status }).eq('id', requestId);
+    if (updateReqErr) throw updateReqErr;
   },
 };

@@ -1,13 +1,29 @@
--- SCRIPT DE CONFIGURACIÓN ACTUALIZADO PARA SUPABASE
+-- SCRIPT DE CONFIGURACIÓN COMPLETO PARA SUPABASE
 -- Copia y pega este código en el SQL Editor de tu proyecto de Supabase y presiona "Run"
 
--- 1. Añadir columna 'archived' a la tabla de perfiles (si no existe)
+-- 1. Asegurar columnas necesarias en la tabla de perfiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 
--- 2. Limpiar tabla previa si existía con nombres de columna incorrectos
+-- 2. Asignar rol de administrador al superusuario
+-- REEMPLAZA EL EMAIL SI ES DIFERENTE
+UPDATE profiles SET role = 'admin' WHERE email = 'azliersylver@gmail.com';
+
+-- 3. Crear la tabla de configuración global (Datos de Pago)
+CREATE TABLE IF NOT EXISTS app_config (
+  id TEXT PRIMARY KEY DEFAULT 'global',
+  bank_name TEXT,
+  account_number TEXT,
+  phone TEXT,
+  id_number TEXT,
+  binance_user TEXT
+);
+
+-- Insertar fila inicial si no existe
+INSERT INTO app_config (id) VALUES ('global') ON CONFLICT (id) DO NOTHING;
+
+-- 4. Crear la tabla de solicitudes de suscripción
 DROP TABLE IF EXISTS subscription_requests;
-
--- 3. Crear la tabla de solicitudes de suscripción con nombres estándar (snake_case)
 CREATE TABLE subscription_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
@@ -21,17 +37,38 @@ CREATE TABLE subscription_requests (
   CONSTRAINT status_check CHECK (status IN ('PENDING', 'CONFIRMED', 'DECLINED'))
 );
 
--- 4. Habilitar Seguridad de Nivel de Fila (RLS)
+-- 5. Habilitar RLS en las tablas
+ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscription_requests ENABLE ROW LEVEL SECURITY;
 
--- 5. Crear Políticas de Acceso (Sin depender de nombres previos)
+-- 6. Políticas para APP_CONFIG (Datos de Pago)
 
+-- Todos los usuarios autenticados pueden VER la configuración
+DROP POLICY IF EXISTS "Todos pueden ver config" ON app_config;
+CREATE POLICY "Todos pueden ver config" ON app_config 
+FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Solo los administradores pueden ACTUALIZAR la configuración
+DROP POLICY IF EXISTS "Admins gestionan config" ON app_config;
+CREATE POLICY "Admins gestionan config" ON app_config 
+FOR ALL USING (
+    EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+    )
+);
+
+-- 7. Políticas para SUBSCRIPTION_REQUESTS (Reportes de Pago)
+
+DROP POLICY IF EXISTS "Usuarios pueden reportar pagos" ON subscription_requests;
 CREATE POLICY "Usuarios pueden reportar pagos" ON subscription_requests 
 FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Usuarios pueden ver sus reportes" ON subscription_requests;
 CREATE POLICY "Usuarios pueden ver sus reportes" ON subscription_requests 
 FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins pueden gestionar reportes" ON subscription_requests;
 CREATE POLICY "Admins pueden gestionar reportes" ON subscription_requests 
 FOR ALL USING (
     EXISTS (
@@ -40,6 +77,8 @@ FOR ALL USING (
     )
 );
 
--- 6. Otorgar permisos
+-- 8. Otorgar permisos
+GRANT ALL ON app_config TO authenticated;
 GRANT ALL ON subscription_requests TO authenticated;
+GRANT ALL ON app_config TO service_role;
 GRANT ALL ON subscription_requests TO service_role;
