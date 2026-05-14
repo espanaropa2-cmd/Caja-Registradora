@@ -182,7 +182,7 @@ const ExpensesView: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => !loading && setIsModalOpen(false)} />
-          <form onSubmit={handleSaveExpense} className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+          <form onSubmit={handleSaveExpense} className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">

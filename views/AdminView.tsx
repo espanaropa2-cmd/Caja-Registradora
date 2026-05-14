@@ -134,9 +134,9 @@ const AdminView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12">
+      <div className="flex flex-col items-center justify-center p-12 min-h-[60vh]">
         <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Cargando Tablero de Control...</p>
+        <p className="text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-xs">Cargando Tablero de Control...</p>
       </div>
     );
   }
@@ -177,19 +177,19 @@ const AdminView: React.FC = () => {
       <div className="flex p-1.5 bg-slate-200/50 dark:bg-slate-800/50 rounded-2xl w-full max-w-xl mx-auto lg:mx-0">
         <button 
           onClick={() => setActiveTab('requests')}
-          className={`flex-1 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'requests' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+          className={`flex-1 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'requests' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <CreditCard size={16} /> Pagos {requests.filter(r => r.status === SubscriptionStatus.PENDING).length > 0 && `(${requests.filter(r => r.status === SubscriptionStatus.PENDING).length})`}
         </button>
         <button 
           onClick={() => setActiveTab('profiles')}
-          className={`flex-1 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'profiles' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+          className={`flex-1 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'profiles' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <Users size={16} /> Negocios
         </button>
         <button 
           onClick={() => setActiveTab('archived')}
-          className={`flex-1 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'archived' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+          className={`flex-1 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'archived' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <Archive size={16} /> Archivados {profiles.filter(p => p.archived).length > 0 && `(${profiles.filter(p => p.archived).length})`}
         </button>

@@ -226,53 +226,53 @@ const SalesHistoryView: React.FC = () => {
       {/* Modal de Confirmación de Anulación */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsDeleteModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsDeleteModalOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <button 
               onClick={() => setIsDeleteModalOpen(false)}
-              className="absolute right-6 top-6 text-slate-300 hover:text-slate-600 transition-colors"
+              className="absolute right-6 top-6 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 transition-colors"
             >
               <X size={24} />
             </button>
             
-            <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner ring-8 ring-rose-50/50">
+            <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner ring-8 ring-rose-50/50 dark:ring-rose-900/10">
               <AlertTriangle size={40} />
             </div>
             
             <div className="text-center space-y-2 mb-8">
-              <h3 className="text-2xl font-black text-slate-800 tracking-tight">¿Anular Operación?</h3>
-              <p className="text-slate-500 font-medium">Esta acción es irreversible y tendrá el siguiente impacto:</p>
+              <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">¿Anular Operación?</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-medium">Esta acción es irreversible y tendrá el siguiente impacto:</p>
             </div>
 
-            <div className="bg-slate-50 rounded-3xl p-6 space-y-4 border border-slate-100 mb-8">
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 space-y-4 border border-slate-100 dark:border-slate-800 mb-8">
               <div className="flex items-start gap-3">
-                <div className="bg-emerald-100 text-emerald-600 p-1.5 rounded-lg mt-0.5">
+                <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-1.5 rounded-lg mt-0.5">
                   <RefreshCw size={14} />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-slate-700 uppercase">Reversión de Inventario</p>
-                  <p className="text-[10px] text-slate-500 font-medium">Los productos comprados se sumarán nuevamente al stock disponible.</p>
+                  <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Reversión de Inventario</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium">Los productos comprados se sumarán nuevamente al stock disponible.</p>
                 </div>
               </div>
               
               {saleToDelete?.status === 'CREDIT' && (
                 <div className="flex items-start gap-3">
-                  <div className="bg-amber-100 text-amber-600 p-1.5 rounded-lg mt-0.5">
+                  <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-1.5 rounded-lg mt-0.5">
                     <ArrowUpRight size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-slate-700 uppercase">Ajuste de Cuentas</p>
-                    <p className="text-[10px] text-slate-500 font-medium">La deuda pendiente de este cliente se reducirá en el monto de esta factura.</p>
+                    <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Ajuste de Cuentas</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium">La deuda pendiente de este cliente se reducirá en el monto de esta factura.</p>
                   </div>
                 </div>
               )}
               
-              <div className="pt-4 border-t border-slate-200 flex justify-between items-end">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-end">
                 <div>
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Factura a anular</p>
-                   <p className="text-sm font-black text-slate-800">Nº {saleToDelete?.id.slice(0, 8)}</p>
+                   <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Factura a anular</p>
+                   <p className="text-sm font-black text-slate-800 dark:text-slate-100">Nº {saleToDelete?.id.slice(0, 8)}</p>
                 </div>
-                <p className="text-2xl font-black text-rose-600">${saleToDelete?.total.toLocaleString()}</p>
+                <p className="text-2xl font-black text-rose-600 dark:text-rose-400">${saleToDelete?.total.toLocaleString()}</p>
               </div>
             </div>
 
@@ -280,17 +280,18 @@ const SalesHistoryView: React.FC = () => {
               <button 
                 onClick={confirmDeleteSale}
                 disabled={loading}
-                className="w-full bg-rose-600 hover:bg-rose-700 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-rose-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-rose-100 dark:shadow-none flex items-center justify-center gap-2 transition-all active:scale-95"
               >
                 {loading ? <Loader2 className="animate-spin" /> : 'Sí, Confirmar Anulación'}
               </button>
               <button 
                 onClick={() => { setIsDeleteModalOpen(false); setSaleToDelete(null); }}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
               >
                 Cancelar
               </button>
             </div>
+
             
             <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] text-center">Seguridad de integridad de datos habilitada</p>
           </div>

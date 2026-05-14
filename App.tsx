@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
+import { dbService } from './services/dbService';
 import { 
   LayoutDashboard, 
   Package, 
@@ -50,6 +51,10 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>('sales');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Determinar si es administrador
+  const isAdmin = profile?.role === 'admin' || profile?.email === ADMIN_EMAIL;
 
   const fetchProfile = useCallback(async (userId: string, email: string) => {
     try {
@@ -141,11 +146,44 @@ const App: React.FC = () => {
     if (profile?.isDarkMode) {
       document.documentElement.classList.add('dark');
       document.documentElement.style.colorScheme = 'dark';
+      document.body.style.backgroundColor = '#020617';
     } else {
       document.documentElement.classList.remove('dark');
       document.documentElement.style.colorScheme = 'light';
+      document.body.style.backgroundColor = '#f8fafc';
     }
   }, [profile?.isDarkMode]);
+
+  const handleSyncSheets = async () => {
+    if (!profile?.sheetsUrl) {
+      alert("Por favor configura la URL de tu Google Sheets en Ajustes.");
+      setCurrentView('settings');
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const data = await dbService.getSales(); // O todos los datos que se quieran respaldar
+      const response = await fetch(profile.sheetsUrl, {
+        method: 'POST',
+        mode: 'no-cors', // Google Apps Script suele requerir no-cors o redirecciones
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'sync_all',
+          data: data,
+          businessName: profile.businessName
+        }),
+      });
+      alert("Sincronización enviada. Nota: Al usar Google Scripts 'no-cors', el resultado no es confirmable pero la data fue despachada.");
+    } catch (err) {
+      console.error("Error syncing sheets:", err);
+      alert("Error al intentar sincronizar con Google Sheets.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -248,7 +286,7 @@ const App: React.FC = () => {
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;
       case 'expenses': return <ExpensesView />;
-      case 'admin': return isSuperUser ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
+      case 'admin': return isAdmin ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'settings': return <SettingsView user={profile} onUpdateUser={async (p) => {
         setProfile(p);
         localStorage.setItem('cajapro_profile', JSON.stringify(p));
@@ -266,10 +304,11 @@ const App: React.FC = () => {
   };
 
   if (loading && !profile) {
+    const isDark = profile?.isDarkMode || (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className={`min-h-screen ${isDark ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'} flex flex-col items-center justify-center p-6 text-center transition-colors duration-500`}>
         <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-        <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Cargando Sistema...</p>
+        <p className={`${isDark ? 'text-slate-400' : 'text-slate-500'} font-black uppercase tracking-widest text-xs`}>Iniciando Aplicación...</p>
       </div>
     );
   }
@@ -299,7 +338,7 @@ const App: React.FC = () => {
           </div>
           
           <nav className="flex-1 space-y-1 overflow-y-auto hide-scrollbar">
-            {profile?.email === ADMIN_EMAIL && (
+            {isAdmin && (
               <NavItem view="admin" icon={Shield} label="Superusuario" />
             )}
             <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
@@ -337,6 +376,17 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
+             {profile?.sheetsUrl && (
+               <button 
+                onClick={handleSyncSheets}
+                disabled={isSyncing}
+                title="Sincronizar con Google Sheets"
+                className="hidden sm:flex items-center gap-2 p-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-100 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all active:scale-95 disabled:opacity-50"
+               >
+                  <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
+                  <span className="hidden xl:block text-[10px] font-black uppercase tracking-widest">Sincronizar</span>
+               </button>
+             )}
              <button className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors lg:hidden" onClick={() => setCurrentView('settings')}>
                 <Settings size={18} />
              </button>

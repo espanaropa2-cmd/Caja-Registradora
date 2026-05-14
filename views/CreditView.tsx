@@ -196,16 +196,16 @@ const CreditView: React.FC<CreditViewProps> = ({ useParallelRate = false }) => {
 
       {/* Modal de Abono - RE-DISEÑADO PARA MÓVIL (Compacto) */}
       {isAbonoOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 text-slate-800 dark:text-slate-100">
           <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setIsAbonoOpen(false)} />
-          <div className="relative bg-white dark:bg-slate-900 w-full max-w-xl h-[95vh] sm:h-auto sm:max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-300 flex flex-col">
+          <div className="relative bg-white dark:bg-slate-950 w-full max-w-xl h-[95vh] sm:h-auto sm:max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-300 flex flex-col border border-slate-100 dark:border-slate-800">
             
             {/* Cabecera Compacta */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-10">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-10 transition-colors">
               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter flex items-center gap-2">
                 <DollarSign className="text-emerald-500" size={18} /> Conciliación Rápida
               </h3>
-              <button onClick={() => setIsAbonoOpen(false)} className="p-2 text-slate-400"><X size={24} /></button>
+              <button onClick={() => setIsAbonoOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X size={24} /></button>
             </div>
             
             <form onSubmit={handleRegisterAbono} className="p-5 lg:p-8 space-y-4 overflow-y-auto hide-scrollbar flex-1 flex flex-col">

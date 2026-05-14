@@ -10,9 +10,21 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Habilitar CORS para permitir peticiones desde apps móviles o web compiladas
-  app.use(cors());
+  // Habilitar CORS para permitir peticiones desde cualquier origen (necesario para apps móviles)
+  app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  }));
   app.use(express.json());
+
+  // Logging middleware for API diagnosis
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      console.log(`[API Request] ${req.method} ${req.path} - Origin: ${req.get('origin') || 'no-origin'}`);
+    }
+    next();
+  });
 
   // Proxy route for BCV Exchange Rate
   app.get("/api/tasa-bcv", async (req, res) => {
@@ -28,7 +40,12 @@ async function startServer() {
       try {
         const url = `https://ve.dolarapi.com/v1/dolares/${type}`;
         console.log(`Fetching ${type} from DolarAPI...`);
-        const response = await axios.get(url, { timeout: 8000 });
+        const response = await axios.get(url, { 
+          timeout: 8000,
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          }
+        });
         if (response.data && response.data.promedio) {
           return res.json({ rate: response.data.promedio, source: `dolarapi-${type}` });
         }
@@ -43,13 +60,22 @@ async function startServer() {
         console.log(`Fetching ${type} from PyDolar...`);
         const response = await axios.get(url, { 
           timeout: 8000,
-          headers: { 'User-Agent': 'Mozilla/5.0' }
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          }
         });
-        const rate = response.data?.monitors?.usd?.price || 
-                     response.data?.monitors?.bcv?.price || 
-                     response.data?.monitors?.[pyDolarTarget]?.price;
         
-        if (rate) return res.json({ rate: parseFloat(String(rate)), source: 'pydolar' });
+        let rate = 0;
+        const data = response.data;
+        if (data && data.monitors) {
+          // Intentar encontrar el monitor específico o el primero disponible
+          const monitor = data.monitors[pyDolarTarget] || data.monitors.usd || Object.values(data.monitors)[0];
+          rate = monitor?.price || 0;
+        } else if (data && data.price) {
+          rate = data.price;
+        }
+        
+        if (rate > 0) return res.json({ rate: parseFloat(String(rate)), source: 'pydolar' });
       } catch (e) {
         console.warn("PyDolar API failed:", e instanceof Error ? e.message : 'Unknown error');
       }
@@ -99,9 +125,38 @@ async function startServer() {
     }
   });
 
-  // Health check
+  // Health check y Diagnóstico
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", environment: process.env.NODE_ENV });
+    res.json({ 
+      status: "ok", 
+      environment: process.env.NODE_ENV,
+      time: new Date().toISOString(),
+      headers: req.headers
+    });
+  });
+
+  app.get("/api/test-connectivity", async (req, res) => {
+    const results: any = {};
+    const targets = [
+      { name: 'DolarAPI', url: 'https://ve.dolarapi.com/v1/dolares/bcv' },
+      { name: 'PyDolar', url: 'https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv' },
+      { name: 'Supabase', url: 'https://usntjpbyfzrnyksuqqut.supabase.co/rest/v1/' }
+    ];
+
+    for (const target of targets) {
+      try {
+        const start = Date.now();
+        await axios.get(target.url, { timeout: 5000, headers: { 'apikey': 'test' } }).catch(e => {
+          // Supabase will 401/400 but that means it's reachable
+          if (e.response) return e.response;
+          throw e;
+        });
+        results[target.name] = { status: 'reachable', latency: `${Date.now() - start}ms` };
+      } catch (e) {
+        results[target.name] = { status: 'failed', error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+    res.json(results);
   });
 
   // Vite middleware for development
