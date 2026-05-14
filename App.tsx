@@ -71,7 +71,8 @@ const App: React.FC = () => {
           alias: data.alias,
           contactPhone: data.contact_phone,
           lastPaymentRef: data.last_payment_ref,
-          useParallelRate: data.use_parallel_rate || false
+          useParallelRate: data.use_parallel_rate || false,
+          isDarkMode: data.is_dark_mode || false
         };
         setProfile(newProfile);
         localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
@@ -136,6 +137,16 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
+  useEffect(() => {
+    if (profile?.isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+    }
+  }, [profile?.isDarkMode]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('cajapro_profile');
@@ -149,11 +160,12 @@ const App: React.FC = () => {
       return (
         <button
           onClick={() => setCurrentView(view)}
-          className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
-            isActive ? 'text-blue-600' : 'text-slate-400'
+          className={`flex flex-col items-center justify-center flex-1 h-full transition-all relative ${
+            isActive ? 'text-slate-900 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'
           }`}
         >
-          <Icon size={20} strokeWidth={isActive ? 3 : 2} />
+          {isActive && <span className="absolute top-0 w-8 h-1 bg-slate-900 dark:bg-blue-500 rounded-full" />}
+          <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
           <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">{label}</span>
         </button>
       );
@@ -161,14 +173,14 @@ const App: React.FC = () => {
     return (
       <button
         onClick={() => { setCurrentView(view); setIsSidebarOpen(false); }}
-        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
           isActive 
-            ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' 
-            : 'text-slate-600 hover:bg-slate-100'
+            ? 'bg-slate-900 dark:bg-blue-500/10 text-white dark:text-blue-400 border border-slate-800 dark:border-blue-500/20' 
+            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-100'
         }`}
       >
-        <Icon size={20} />
-        <span className="font-bold">{label}</span>
+        <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-white dark:text-blue-400' : 'text-slate-400 group-hover:text-slate-600 transition-colors'} />
+        <span className={`text-sm tracking-tight ${isActive ? 'font-bold' : 'font-medium'}`}>{label}</span>
       </button>
     );
   };
@@ -229,14 +241,14 @@ const App: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'dashboard': return <DashboardView useParallelRate={profile.useParallelRate} />;
+      case 'dashboard': return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'inventory': return <InventoryView useParallelRate={profile.useParallelRate} />;
       case 'sales': return <SalesView useParallelRate={profile.useParallelRate} />;
       case 'sales_history': return <SalesHistoryView />;
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;
       case 'expenses': return <ExpensesView />;
-      case 'admin': return isSuperUser ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} />;
+      case 'admin': return isSuperUser ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'settings': return <SettingsView user={profile} onUpdateUser={async (p) => {
         setProfile(p);
         localStorage.setItem('cajapro_profile', JSON.stringify(p));
@@ -245,7 +257,8 @@ const App: React.FC = () => {
           business_name: p.businessName,
           email: p.email,
           sheets_url: p.sheetsUrl,
-          use_parallel_rate: p.useParallelRate
+          use_parallel_rate: p.useParallelRate,
+          is_dark_mode: p.isDarkMode
         }).eq('id', p.id);
       }} />;
       default: return <DashboardView />;
@@ -266,21 +279,23 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+    <div className={`flex h-screen overflow-hidden font-sans transition-colors duration-500 ${profile?.isDarkMode ? 'bg-[#020617] text-slate-100' : 'bg-[#f8fafc] text-slate-900'}`}>
       {/* Mobile Drawer Overlay */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-[2px] z-50 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
       {/* Sidebar - Desktop & Tablet */}
-      <aside className={`fixed lg:static inset-y-0 left-0 w-72 bg-white border-r border-slate-200 z-[60] transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 w-72 bg-white dark:bg-[#0f172a] border-r border-slate-200 dark:border-slate-800/60 z-[60] transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full p-6">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-10">
             <div className="flex items-center space-x-3">
-              <div className="bg-blue-600 p-2.5 rounded-2xl text-white shadow-lg shadow-blue-100"><Store size={24} /></div>
-              <h1 className="text-xl font-black tracking-tighter text-slate-800 break-words">{profile?.businessName || 'Caja Pro'}</h1>
+              <div className="bg-slate-900 dark:bg-blue-600/10 p-2.5 rounded-xl text-white dark:text-blue-400 border border-slate-800 dark:border-blue-500/20">
+                <Store size={22} strokeWidth={2.5} />
+              </div>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 break-words">{profile?.businessName || 'Caja Pro'}</h1>
             </div>
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400"><X size={20}/></button>
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-slate-600 transition-colors"><X size={20}/></button>
           </div>
           
           <nav className="flex-1 space-y-1 overflow-y-auto hide-scrollbar">
@@ -294,14 +309,14 @@ const App: React.FC = () => {
             <NavItem view="clients" icon={Users} label="Clientes" />
             <NavItem view="credit" icon={CreditCard} label="Crédito" />
             <NavItem view="expenses" icon={TrendingDown} label="Egresos" />
-            <div className="my-6 border-t border-slate-100" />
+            <div className="my-6 border-t border-slate-100 dark:border-slate-800/50" />
             <NavItem view="settings" icon={Settings} label="Ajustes" />
           </nav>
 
-          <div className="pt-6 border-t border-slate-100">
-            <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors font-bold">
-              <LogOut size={20} />
-              <span>Salir del Sistema</span>
+          <div className="pt-6 border-t border-slate-100 dark:border-slate-800/50">
+            <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all font-semibold text-sm">
+              <LogOut size={18} />
+              <span>Cerrar Sesión</span>
             </button>
           </div>
         </div>
@@ -309,42 +324,43 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <header className="h-16 lg:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-10 flex-shrink-0">
-          <div className="flex items-center space-x-4">
-            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2.5 bg-slate-50 text-slate-600 rounded-xl"><Menu size={20} /></button>
+        <header className="h-16 lg:h-20 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between px-6 lg:px-10 flex-shrink-0 z-40">
+          <div className="flex items-center space-x-6">
+            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-slate-700/50"><Menu size={20} /></button>
             <div className="flex flex-col">
-              <h2 className="text-sm lg:text-lg font-black text-slate-800 truncate max-w-[150px] lg:max-w-none">{profile?.businessName}</h2>
-              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Terminal Online
-              </p>
+              <h2 className="text-sm lg:text-base font-bold text-slate-900 dark:text-slate-100 truncate max-w-[150px] lg:max-w-none">{profile?.businessName}</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.3)]"></span>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Servicio Activo</p>
+              </div>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-             <button className="p-2.5 bg-blue-50 text-blue-600 rounded-xl lg:hidden" onClick={() => setCurrentView('settings')}>
-                <Settings size={20} />
+          <div className="flex items-center gap-3">
+             <button className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors lg:hidden" onClick={() => setCurrentView('settings')}>
+                <Settings size={18} />
              </button>
-             <div className="hidden lg:flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-               <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xs font-black">
-                 {profile?.businessName.charAt(0)}
+             <div className="hidden lg:flex items-center space-x-3 bg-slate-50 dark:bg-slate-800/30 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700/50">
+               <div className="w-7 h-7 rounded-lg bg-slate-800 dark:bg-blue-600/80 flex items-center justify-center text-white text-[10px] font-black tracking-tighter">
+                 {profile?.businessName.charAt(0).toUpperCase()}
                </div>
-               <span className="text-xs font-bold text-slate-600">{profile?.email}</span>
+               <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{profile?.email}</span>
              </div>
           </div>
         </header>
 
-        {/* CONTENEDOR DE VISTAS: Se aumentó el padding inferior para móvil (pb-32) */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-10 pb-32 lg:pb-10 bg-slate-50 hide-scrollbar">
+        {/* CONTENEDOR DE VISTAS */}
+        <div className="flex-1 overflow-y-auto p-4 lg:p-10 pb-32 lg:pb-10 bg-[#f8fafc] dark:bg-[#020617] hide-scrollbar transition-colors duration-500">
           <div className="max-w-7xl mx-auto">{renderView()}</div>
         </div>
 
         {/* Bottom Navigation for Mobile */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+        <nav className="lg:hidden fixed bottom-6 left-6 right-6 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 flex items-center justify-around px-2 z-[70] shadow-2xl shadow-slate-200/50 dark:shadow-black/60 rounded-[2rem] overflow-hidden">
           <NavItem view="sales" icon={ShoppingCart} label="Venta" mobile />
           <NavItem view="inventory" icon={Package} label="Stock" mobile />
           <NavItem view="sales_history" icon={History} label="Hist" mobile />
           <NavItem view="credit" icon={CreditCard} label="Cobro" mobile />
-          <NavItem view="dashboard" icon={LayoutDashboard} label="Dash" mobile />
+          <NavItem view="dashboard" icon={LayoutDashboard} label="Panel" mobile />
         </nav>
       </main>
     </div>

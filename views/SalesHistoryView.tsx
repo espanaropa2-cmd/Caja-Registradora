@@ -107,38 +107,38 @@ const SalesHistoryView: React.FC = () => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Historial de Operaciones</h1>
-          <p className="text-slate-500 font-medium">Control y auditoría de ventas registradas.</p>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Historial de Operaciones</h1>
+          <p className="text-slate-500 dark:text-slate-400 font-medium">Control y auditoría de ventas registradas.</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl">
             <ShoppingBag size={20} />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Facturación Periodo</p>
-            <p className="text-xl font-black text-slate-800">${totals.toLocaleString()}</p>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Facturación Periodo</p>
+            <p className="text-xl font-black text-slate-800 dark:text-slate-100">${totals.toLocaleString()}</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600" size={18} />
           <input 
             type="text" 
             placeholder="Nº Factura o Cliente..." 
-            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-medium shadow-sm transition-all"
+            className="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-medium shadow-sm transition-all text-slate-900 dark:text-slate-100"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto hide-scrollbar">
+        <div className="flex bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto hide-scrollbar">
           {(['hoy', 'semana', 'mes', 'año', 'todos'] as TimeRange[]).map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
               className={`flex-1 min-w-[80px] px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
-                timeRange === range ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-400 hover:text-slate-600'
+                timeRange === range ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
               }`}
             >
               {range}
@@ -147,50 +147,50 @@ const SalesHistoryView: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-xl">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+              <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">
                 <th className="px-8 py-6">Fecha & Registro</th>
                 <th className="px-8 py-6">Comprador</th>
                 <th className="px-8 py-6">Monto Total</th>
                 <th className="px-8 py-6">Estado</th>
-                <th className="px-8 py-6">Acciones</th>
+                <th className="px-8 py-6 text-center">Anular</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredSales.map((sale) => (
                 <tr 
                   key={sale.id} 
-                  className="hover:bg-slate-50/80 transition-all group cursor-pointer"
+                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all group cursor-pointer"
                   onClick={() => openDetailsModal(sale)}
                 >
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-slate-100 rounded-lg text-slate-400">
+                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-400 dark:text-slate-500">
                         <Calendar size={14} />
                       </div>
                       <div>
-                        <p className="text-sm font-black text-slate-800">{new Date(sale.date).toLocaleDateString()}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">ID: {sale.id.slice(0, 8)}</p>
+                        <p className="text-sm font-black text-slate-800 dark:text-slate-100">{new Date(sale.date).toLocaleDateString()}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase">ID: {sale.id.slice(0, 8)}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${sale.clientId ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${sale.clientId ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
                         {sale.clientId ? <User size={14} /> : <ArrowUpRight size={14} />}
                       </div>
-                      <p className="text-sm font-black text-slate-700">{getClientName(sale.clientId)}</p>
+                      <p className="text-sm font-black text-slate-700 dark:text-slate-300">{getClientName(sale.clientId)}</p>
                     </div>
                   </td>
-                  <td className="px-8 py-6 font-black text-slate-900 text-lg tracking-tight">
+                  <td className="px-8 py-6 font-black text-slate-900 dark:text-slate-100 text-lg tracking-tight">
                     ${sale.total.toLocaleString()}
                   </td>
                   <td className="px-8 py-6">
                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                      sale.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      sale.status === 'COMPLETED' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
                     }`}>
                       {sale.status === 'COMPLETED' ? 'PAGADO' : 'CRÉDITO'}
                     </span>
@@ -202,7 +202,7 @@ const SalesHistoryView: React.FC = () => {
                          e.stopPropagation();
                          openDeleteModal(sale);
                        }}
-                       className="p-3 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all shadow-sm group-hover:shadow group-hover:scale-105 active:scale-95"
+                       className="p-3 text-rose-300 hover:text-rose-600 dark:text-rose-900/60 dark:hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl transition-all shadow-sm group-hover:shadow group-hover:scale-105 active:scale-95"
                        title="Anular Transacción"
                      >
                        <Trash2 size={20} />
@@ -213,8 +213,8 @@ const SalesHistoryView: React.FC = () => {
               {filteredSales.length === 0 && (
                 <tr>
                   <td colSpan={5} className="py-24 text-center">
-                    <History size={64} className="mx-auto text-slate-100 mb-4" />
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin registros encontrados</p>
+                    <History size={64} className="mx-auto text-slate-100 dark:text-slate-800 mb-4" />
+                    <p className="text-xs font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest">Sin registros encontrados</p>
                   </td>
                 </tr>
               )}
@@ -300,33 +300,33 @@ const SalesHistoryView: React.FC = () => {
       {/* Modal de Detalles de Venta */}
       {isDetailsModalOpen && selectedSale && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsDetailsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+          <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsDetailsModalOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-10">
               <div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Detalle de Factura</h3>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Nº {selectedSale.id.slice(0, 8)} • {new Date(selectedSale.date).toLocaleString()}</p>
+                <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Detalle de Factura</h3>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest">Nº {selectedSale.id.slice(0, 8)} • {new Date(selectedSale.date).toLocaleString()}</p>
               </div>
-              <button onClick={() => setIsDetailsModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">
+              <button onClick={() => setIsDetailsModalOpen(false)} className="p-2 text-slate-400 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors">
                 <X size={24} />
               </button>
             </div>
 
             <div className="p-8 overflow-y-auto hide-scrollbar space-y-8">
               {/* Información del Cliente */}
-              <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
+              <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${selectedSale.clientId ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${selectedSale.clientId ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
                     {selectedSale.clientId ? <User size={24} /> : <ArrowUpRight size={24} />}
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente / Tipo</p>
-                    <p className="text-lg font-black text-slate-800">{getClientName(selectedSale.clientId)}</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Cliente / Tipo</p>
+                    <p className="text-lg font-black text-slate-800 dark:text-slate-100">{getClientName(selectedSale.clientId)}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                    selectedSale.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    selectedSale.status === 'COMPLETED' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
                   }`}>
                     {selectedSale.status === 'COMPLETED' ? 'PAGADA' : 'CRÉDITO'}
                   </span>
@@ -335,10 +335,10 @@ const SalesHistoryView: React.FC = () => {
 
               {/* Desglose de Productos */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Productos Vendidos</h4>
-                <div className="border border-slate-100 rounded-3xl overflow-hidden">
+                <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Productos Vendidos</h4>
+                <div className="border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                       <tr>
                         <th className="px-6 py-4">Producto</th>
                         <th className="px-6 py-4 text-center">Cant.</th>
@@ -346,13 +346,13 @@ const SalesHistoryView: React.FC = () => {
                         <th className="px-6 py-4 text-right">Subtotal</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                       {selectedSale.items.map((item, idx) => (
                         <tr key={idx} className="text-sm">
-                          <td className="px-6 py-4 font-bold text-slate-700">{item.name}</td>
-                          <td className="px-6 py-4 text-center font-black text-slate-500">{item.quantity}</td>
-                          <td className="px-6 py-4 text-right font-bold text-slate-600">${item.price.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-right font-black text-slate-800">${(item.price * item.quantity).toLocaleString()}</td>
+                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300">{item.name}</td>
+                          <td className="px-6 py-4 text-center font-black text-slate-500 dark:text-slate-400">{item.quantity}</td>
+                          <td className="px-6 py-4 text-right font-bold text-slate-600 dark:text-slate-400">${item.price.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-slate-100">${(item.price * item.quantity).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -362,24 +362,24 @@ const SalesHistoryView: React.FC = () => {
 
               {/* Resumen Financiero */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-slate-900 rounded-[2rem] p-8 text-white relative overflow-hidden">
+                <div className="bg-slate-900 dark:bg-blue-900/20 rounded-[2rem] p-8 text-white relative overflow-hidden border dark:border-blue-800/50">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <ShoppingBag size={64} />
                   </div>
-                  <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Total de la Factura</p>
-                  <p className="text-4xl font-black text-white">${selectedSale.total.toLocaleString()}</p>
+                  <p className="text-[10px] font-black text-white/50 dark:text-blue-400/50 uppercase tracking-widest mb-1">Total de la Factura</p>
+                  <p className="text-4xl font-black text-white dark:text-blue-100">${selectedSale.total.toLocaleString()}</p>
                 </div>
 
                 {selectedSale.status === 'CREDIT' && (
-                  <div className="bg-emerald-50 rounded-[2rem] p-8 border border-emerald-100 relative overflow-hidden">
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-[2rem] p-8 border border-emerald-100 dark:border-emerald-800 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-600">
                       <RefreshCw size={64} />
                     </div>
-                    <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Pagado hasta hoy</p>
-                    <p className="text-4xl font-black text-emerald-600">${selectedSale.amountPaid.toLocaleString()}</p>
-                    <div className="mt-4 pt-4 border-t border-emerald-200/50">
-                      <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Saldo Pendiente</p>
-                      <p className="text-xl font-black text-rose-500">${(selectedSale.total - selectedSale.amountPaid).toLocaleString()}</p>
+                    <p className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/60 uppercase tracking-widest mb-1">Pagado hasta hoy</p>
+                    <p className="text-4xl font-black text-emerald-600 dark:text-emerald-400">${selectedSale.amountPaid.toLocaleString()}</p>
+                    <div className="mt-4 pt-4 border-t border-emerald-200/50 dark:border-emerald-800">
+                      <p className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/60 uppercase tracking-widest mb-1">Saldo Pendiente</p>
+                      <p className="text-xl font-black text-rose-500 dark:text-rose-400">${(selectedSale.total - selectedSale.amountPaid).toLocaleString()}</p>
                     </div>
                   </div>
                 )}
@@ -388,25 +388,25 @@ const SalesHistoryView: React.FC = () => {
               {/* Historial de Pagos / Abonos */}
               {selectedSale.payments && selectedSale.payments.length > 0 && (
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Historial de Pagos</h4>
-                  <div className="bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden">
+                  <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Historial de Pagos</h4>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden">
                     <div className="p-4 space-y-3">
                       {selectedSale.payments.map((payment, idx) => (
-                        <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
+                        <div key={idx} className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 rounded-2xl p-4 flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center shadow-inner">
+                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-xl flex items-center justify-center shadow-inner">
                               <DollarSign size={18} />
                             </div>
                             <div>
-                               <p className="text-xs font-black text-slate-800 uppercase space-x-2">
+                               <p className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase space-x-2">
                                  <span>{payment.method}</span>
-                                 {payment.reference && <span className="text-slate-400 font-bold ml-2">#{payment.reference}</span>}
+                                 {payment.reference && <span className="text-slate-400 dark:text-slate-500 font-bold ml-2">#{payment.reference}</span>}
                                </p>
-                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{new Date(payment.date).toLocaleString()}</p>
+                               <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{new Date(payment.date).toLocaleString()}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                             <p className="text-lg font-black text-emerald-600">+${payment.amount.toLocaleString()}</p>
+                             <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">+${payment.amount.toLocaleString()}</p>
                           </div>
                         </div>
                       ))}
@@ -416,10 +416,10 @@ const SalesHistoryView: React.FC = () => {
               )}
             </div>
 
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+            <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex justify-end">
               <button 
                 onClick={() => setIsDetailsModalOpen(false)}
-                className="px-8 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95 shadow-sm"
+                className="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-sm"
               >
                 Cerrar Detalle
               </button>

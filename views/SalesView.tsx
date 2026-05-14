@@ -235,42 +235,51 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in">
-      <div className="flex-1 flex flex-col space-y-4 lg:space-y-6">
+    <div className="flex flex-col lg:flex-row h-full gap-8 animate-in fade-in duration-700">
+      <div className="flex-1 space-y-6 flex flex-col min-h-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-2">
+          <div>
+            <h1 className="text-2xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Terminal de Ventas</h1>
+            <p className="text-xs lg:text-lg text-slate-500 dark:text-slate-400 font-medium">Realiza transacciones y créditos al instante.</p>
+          </div>
+          <div className="bg-white dark:bg-slate-900 px-6 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-end">
+            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Tasa BCV</span>
+            <span className="text-sm font-black text-blue-600 dark:text-blue-400">1 USD = {rate.toLocaleString()} BS</span>
+          </div>
+        </div>
         {/* Buscador de Productos */}
-        <div className="bg-white p-5 lg:p-7 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+        <div className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 transition-colors">
           <div className="flex items-center justify-between px-2">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-              <ScanLine size={16} className="text-blue-500" /> Terminal de Ventas
+            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+              <ScanLine size={16} className="text-blue-500" /> Búsqueda de Productos
             </h3>
             <button 
               onClick={openScanner}
-              className="lg:hidden p-3 bg-blue-600 text-white rounded-2xl shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+              className="lg:hidden p-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl shadow-sm flex items-center gap-3 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all border border-slate-800 dark:border-blue-500/30"
             >
-              <Camera size={18} /> Escanear
+              <Camera size={20} /> Escanear
             </button>
           </div>
-          <div className="relative">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={24} />
+          <div className="relative group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" size={24} />
             <input 
               type="text" 
-              placeholder="Escribe nombre o código..." 
-              className="w-full pl-16 pr-4 py-5 lg:py-6 bg-slate-50 border border-slate-200 rounded-3xl outline-none text-base lg:text-xl font-black transition-all focus:bg-white focus:ring-4 focus:ring-blue-50 shadow-inner"
+              placeholder="Escanea o escribe nombre del producto..." 
+              className="w-full pl-16 pr-6 py-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl outline-none text-base font-bold dark:text-slate-100 transition-all focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/10 shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            {filteredProducts.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-200 rounded-[2rem] shadow-2xl z-[80] overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            {filteredProducts.length > 0 && searchTerm.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-[80] overflow-hidden animate-in slide-in-from-top-2 duration-200">
                 {filteredProducts.map(p => (
-                  <button key={p.id} onClick={() => addToCart(p)} className="w-full p-5 flex items-center justify-between hover:bg-blue-50 transition-all text-left border-b border-slate-50 last:border-0 group">
+                  <button key={p.id} onClick={() => { addToCart(p); setSearchTerm(''); }} className="w-full p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all text-left border-b border-slate-100 dark:border-slate-800 last:border-0 group">
                     <div className="flex flex-col">
-                      <span className="font-black text-slate-800 group-hover:text-blue-600">{p.name}</span>
-                      <span className="text-[10px] font-black uppercase text-slate-400">Existencia: {p.stock} uds</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{p.name}</span>
+                      <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mt-0.5">Stock: {p.stock} uds • {p.category || 'General'}</span>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-blue-600 text-lg">${p.price.toLocaleString()}</p>
-                      {rate > 0 && <p className="text-[10px] font-black text-slate-400">Bs. {(p.price * rate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>}
-                      <p className="text-[9px] font-bold text-emerald-500 uppercase">Añadir +</p>
+                      <p className="font-black text-slate-900 dark:text-white text-lg">${p.price.toLocaleString()}</p>
+                      {rate > 0 && <p className="text-[10px] font-bold text-slate-400">≈ Bs. {(p.price * rate).toLocaleString()}</p>}
                     </div>
                   </button>
                 ))}
@@ -280,14 +289,14 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
         </div>
 
         {/* Buscador y Creador de Clientes */}
-        <div className="bg-white p-5 lg:p-7 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
-           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Cliente / Receptor</h3>
-           <div className="relative">
-             <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+        <div className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 transition-colors">
+           <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] px-2">Cliente / Receptor</h3>
+           <div className="relative group">
+             <User className={`absolute left-6 top-1/2 -translate-y-1/2 ${selectedClient ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}`} size={22} />
              <input 
                type="text" 
-               placeholder="Venta de contado (Escriba para buscar o crear)" 
-               className="w-full pl-14 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700"
+               placeholder="Venta rápida (Escribe para buscar o crear cliente)" 
+               className={`w-full pl-16 pr-14 py-4 bg-slate-50 dark:bg-slate-800/50 border ${selectedClient ? 'border-emerald-200 dark:border-emerald-500/50' : 'border-slate-200 dark:border-slate-700'} rounded-2xl outline-none font-bold text-sm transition-all focus:bg-white dark:focus:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
                value={selectedClient ? selectedClient.name : clientSearch}
                onChange={(e) => {
                  setClientSearch(e.target.value);
@@ -295,20 +304,20 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                }}
              />
              {selectedClient && (
-               <button onClick={() => { setSelectedClient(null); setClientSearch(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-rose-500"><X size={18}/></button>
+               <button onClick={() => { setSelectedClient(null); setClientSearch(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all"><X size={18}/></button>
              )}
              
              {/* Dropdown de Clientes */}
              {clientSearch.length > 0 && !selectedClient && (
-               <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[70] overflow-hidden animate-in slide-in-from-top-1 duration-200">
+               <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[70] overflow-hidden animate-in slide-in-from-top-1 duration-200">
                  {/* Resultados de Búsqueda */}
                  {filteredClients.map(c => (
-                   <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); }} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-all border-b last:border-0">
-                      <div className="flex flex-col text-left">
-                        <span className="font-bold text-slate-800">{c.name}</span>
-                        <span className="text-[9px] text-slate-400 uppercase font-black">Cliente Existente</span>
+                   <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); }} className="w-full p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border-b border-slate-100 dark:border-slate-800 last:border-0 text-left">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 dark:text-slate-100">{c.name}</span>
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-widest mt-0.5">Cliente Frecuente</span>
                       </div>
-                      <span className="text-[10px] font-black text-blue-600 uppercase">Seleccionar</span>
+                      <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Seleccionar</span>
                    </button>
                  ))}
                  
@@ -316,14 +325,14 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                  <button 
                   onClick={handleQuickCreateClient}
                   disabled={creatingClient}
-                  className="w-full p-5 flex items-center gap-4 bg-blue-50 hover:bg-blue-100 transition-all text-left group"
+                  className="w-full p-6 flex items-center gap-5 bg-blue-50 dark:bg-blue-600/10 hover:bg-blue-100 dark:hover:bg-blue-600/20 transition-all text-left group"
                  >
-                   <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
-                     {creatingClient ? <Loader2 className="animate-spin" size={20}/> : <UserPlus size={20} />}
+                   <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm group-hover:scale-110 transition-transform">
+                     {creatingClient ? <Loader2 className="animate-spin" size={24}/> : <UserPlus size={24} />}
                    </div>
                    <div className="flex flex-col">
-                     <span className="text-xs font-black text-blue-700 uppercase tracking-tight">Registrar nuevo cliente:</span>
-                     <span className="font-bold text-slate-800 text-base">"{clientSearch}"</span>
+                     <span className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest leading-none mb-1">Registrar como nuevo:</span>
+                     <span className="font-bold text-slate-800 dark:text-slate-100 text-lg">"{clientSearch}"</span>
                    </div>
                  </button>
                </div>
@@ -334,7 +343,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
         {cart.length > 0 && (
           <button 
             onClick={() => setIsCartVisible(true)}
-            className="lg:hidden fixed bottom-20 right-6 w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center z-[90] animate-bounce-short"
+            className="lg:hidden fixed bottom-24 right-6 w-16 h-16 bg-slate-900 dark:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center z-[90] animate-bounce-short border-2 border-white dark:border-blue-400/30"
           >
             <div className="relative">
               <ShoppingCart size={24} />
@@ -345,30 +354,42 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
       </div>
 
       {/* Panel de Carrito */}
-      <div className={`fixed lg:static inset-0 z-[100] lg:z-0 lg:w-96 transform transition-transform duration-300 flex flex-col ${isCartVisible ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
-        <div className="absolute inset-0 bg-slate-900/40 lg:hidden" onClick={() => setIsCartVisible(false)} />
-        <div className="relative bg-white lg:bg-slate-900 h-[90vh] lg:h-full mt-auto lg:mt-0 rounded-t-[3rem] lg:rounded-[3rem] shadow-2xl flex flex-col lg:p-8 p-6 overflow-hidden">
+      <div className={`fixed lg:static inset-0 z-[100] lg:z-0 lg:w-[450px] transform transition-transform duration-500 flex flex-col ${isCartVisible ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
+        <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsCartVisible(false)} />
+        <div className="relative bg-white dark:bg-[#0f172a] h-[92vh] lg:h-full mt-auto lg:mt-0 rounded-t-[3rem] lg:rounded-[3rem] shadow-2xl flex flex-col lg:p-10 p-6 overflow-hidden border-l border-slate-100 dark:border-slate-800 transition-colors">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-black text-slate-800 lg:text-white uppercase tracking-tighter flex items-center gap-2">
-               <ShoppingCart size={24} className="text-blue-500" /> Tu Carrito
-            </h3>
-            <button onClick={() => setIsCartVisible(false)} className="lg:hidden p-2 text-slate-400"><X size={28}/></button>
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-500/30">
+                <ShoppingCart size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Mi Carrito</h3>
+                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mt-1">{cart.length} Items seleccionados</p>
+              </div>
+            </div>
+            <button onClick={() => setIsCartVisible(false)} className="lg:hidden p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X size={28}/></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto hide-scrollbar space-y-4 mb-6">
+          <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3 mb-8">
             {cart.map(item => (
-              <div key={item.productId} className="bg-slate-50 lg:bg-white/5 p-4 rounded-3xl border border-slate-100 lg:border-white/10 flex items-center justify-between">
+              <div key={item.productId} className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 flex items-center justify-between group">
                 <div className="flex-1 min-w-0 pr-4">
-                  <p className="font-black text-slate-800 lg:text-white truncate text-sm">{item.name}</p>
-                  <p className="text-xs font-bold text-slate-400">${item.price.toLocaleString()}</p>
+                  <p className="font-bold text-slate-900 dark:text-slate-100 truncate text-sm">{item.name}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">${item.price.toLocaleString()} c/u</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 rounded-xl bg-white lg:bg-white/10 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><Minus size={14}/></button>
-                  <span className="font-black text-slate-800 lg:text-white w-6 text-center">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 rounded-xl bg-white lg:bg-white/10 flex items-center justify-center text-slate-400 hover:text-blue-500 transition-colors shadow-sm"><Plus size={14}/></button>
+                <div className="flex items-center gap-2.5">
+                  <button onClick={() => updateQuantity(item.productId, -1)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition-all shadow-sm border border-slate-100 dark:border-slate-700 active:scale-90"><Minus size={14}/></button>
+                  <span className="font-black text-slate-900 dark:text-white w-5 text-center text-sm">{item.quantity}</span>
+                  <button onClick={() => updateQuantity(item.productId, 1)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all shadow-sm border border-slate-100 dark:border-slate-700 active:scale-90"><Plus size={14}/></button>
                 </div>
               </div>
             ))}
+            {cart.length === 0 && (
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 py-10">
+                <ShoppingCart size={48} strokeWidth={1} className="mb-2 opacity-30" />
+                <p className="text-[10px] font-black uppercase tracking-widest">El carrito está vacío</p>
+              </div>
+            )}
           </div>
 
             <div className="space-y-4">

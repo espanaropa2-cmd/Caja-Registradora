@@ -46,10 +46,10 @@ const renderActiveShape = (props: any) => {
       />
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} textAnchor={textAnchor} fill="#1e293b" style={{ fontSize: '10px', fontWeight: '900' }}>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} textAnchor={textAnchor} fill="currentColor" className="text-slate-800 dark:text-slate-100" style={{ fontSize: '10px', fontWeight: '900' }}>
         {typeof value === 'number' && value >= 100 ? `$${value.toLocaleString()}` : value}
       </text>
-      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} dy={12} textAnchor={textAnchor} fill="#94a3b8" style={{ fontSize: '8px', fontWeight: 'bold' }}>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} dy={12} textAnchor={textAnchor} fill="currentColor" className="text-slate-400 dark:text-slate-500" style={{ fontSize: '8px', fontWeight: 'bold' }}>
         {`(${(percent * 100).toFixed(1)}%)`}
       </text>
     </g>
@@ -58,9 +58,11 @@ const renderActiveShape = (props: any) => {
 
 interface DashboardViewProps {
   useParallelRate?: boolean;
+  businessName?: string;
+  isDarkMode?: boolean;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, businessName = 'Mi Negocio', isDarkMode = false }) => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -289,37 +291,37 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }
   };
 
   const StatCard = ({ title, value, icon: Icon, iconColor, sub }: any) => (
-    <div className="bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-200 shadow-sm relative overflow-hidden group transition-all hover:border-blue-100 h-full">
+    <div className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group transition-all hover:border-slate-300 dark:hover:border-slate-700 h-full">
       <div className="relative z-10">
-        <p className="text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
-        <h3 className="text-xl lg:text-4xl font-black text-slate-800 tracking-tighter leading-none">${value.toLocaleString()}</h3>
-        <p className="text-[8px] lg:text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-tight">{sub}</p>
+        <p className="text-[9px] lg:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{title}</p>
+        <h3 className="text-xl lg:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tighter leading-none">${value.toLocaleString()}</h3>
+        <p className="text-[8px] lg:text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-tight">{sub}</p>
       </div>
-      <div className={`absolute -right-4 lg:-right-6 -bottom-4 lg:-bottom-6 ${iconColor} opacity-[0.08] lg:opacity-[0.06] pointer-events-none transition-transform duration-700 group-hover:scale-125 group-hover:-rotate-12 print:hidden`}>
+      <div className={`absolute -right-4 lg:-right-6 -bottom-4 lg:-bottom-6 ${iconColor} opacity-[0.08] dark:opacity-[0.1] pointer-events-none transition-transform duration-700 group-hover:scale-125 group-hover:-rotate-12 print:hidden`}>
         <Icon size={140} strokeWidth={1} />
       </div>
     </div>
   );
 
-  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-slate-400 dark:text-blue-500" size={40} /></div>;
 
   return (
     <div className="space-y-6 lg:space-y-10 pb-10">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl lg:text-4xl font-black text-slate-800 tracking-tighter">Analítica</h1>
-          <p className="text-xs lg:text-lg text-slate-500 font-medium">Margen real y flujo de caja.</p>
+          <h1 className="text-2xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Analítica</h1>
+          <p className="text-xs lg:text-lg text-slate-500 dark:text-slate-400 font-medium">Margen real y flujo de caja.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
           <button 
             onClick={handleExportPDF}
-            className="w-full sm:w-auto bg-blue-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
+            className="w-full sm:w-auto bg-slate-900 dark:bg-blue-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-sm active:scale-95 border border-slate-800 dark:border-blue-500/30"
           >
             <Printer size={16} /> Exportar Balance PDF
           </button>
-          <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm w-full lg:w-auto">
+          <div className="flex bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm w-full lg:w-auto overflow-hidden">
             {(['hoy', 'semana', 'mes', 'año'] as DashboardPeriod[]).map(p => (
-              <button key={p} onClick={() => setPeriod(p)} className={`flex-1 lg:px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${period === p ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}>
+              <button key={p} onClick={() => setPeriod(p)} className={`flex-1 lg:px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${period === p ? 'bg-slate-900 dark:bg-blue-600/20 text-white dark:text-blue-400 border border-slate-800 dark:border-blue-500/30 shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
                 {p}
               </button>
             ))}
@@ -335,17 +337,26 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10">
-        <div className="lg:col-span-2 bg-white p-6 lg:p-10 rounded-[3rem] border border-slate-200 shadow-sm relative overflow-hidden">
-          <h3 className="text-[10px] lg:text-xs font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 lg:p-10 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+          <h3 className="text-[10px] lg:text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest mb-8 flex items-center gap-2">
             <ArrowUpRight className="text-blue-600" size={16} /> Flujo de Ingreso Bruto
           </h3>
           <div className="h-64 lg:h-96 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#1e293b' : '#f1f5f9'} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} />
-                <Tooltip contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)'}} />
+                <Tooltip 
+                   contentStyle={{ 
+                    backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', 
+                    borderRadius: '24px', 
+                    border: isDarkMode ? '1px solid #1e293b' : '1px solid #f1f5f9',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                    fontSize: '11px',
+                    fontWeight: '800'
+                  }} 
+                />
                 <Area type="monotone" dataKey="ingresos" stroke="#3b82f6" strokeWidth={4} fill="#3b82f6" fillOpacity={0.05} />
                 <Area type="monotone" dataKey="gastos" stroke="#f43f5e" strokeWidth={4} fill="#f43f5e" fillOpacity={0.05} />
               </AreaChart>
@@ -353,16 +364,16 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }
           </div>
         </div>
 
-        <div className="bg-white p-6 lg:p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col">
-          <h3 className="text-[10px] lg:text-xs font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-900 p-6 lg:p-10 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+          <h3 className="text-[10px] lg:text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest mb-8 flex items-center gap-2">
             <PieIcon className="text-blue-600" size={16} /> Rentabilidad por Categoría
           </h3>
           
           <div className="flex-1 space-y-8 overflow-y-auto hide-scrollbar px-2">
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-2">
-                <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><Award size={14}/></div>
-                <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Top Márgenes Netos ($)</span>
+                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg"><Award size={14}/></div>
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-tight">Top Márgenes Netos ($)</span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -378,7 +389,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }
                       onMouseEnter={(_, index) => setActiveProfitIndex(index)}
                       onClick={(_, index) => setActiveProfitIndex(index)}
                     >
-                      {profitPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      {profitPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke={isDarkMode ? '#0f172a' : '#ffffff'} />)}
                     </Pie>
                     <Tooltip cursor={{ fill: 'transparent' }} content={() => null} />
                     <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase'}} />
@@ -387,10 +398,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }
               </div>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-slate-100">
+            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2 px-2">
-                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Target size={14}/></div>
-                <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Volumen de Unidades</span>
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg"><Target size={14}/></div>
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-tight">Volumen de Unidades</span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -406,7 +417,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }
                       onMouseEnter={(_, index) => setActiveUnitsIndex(index)}
                       onClick={(_, index) => setActiveUnitsIndex(index)}
                     >
-                      {unitsPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      {unitsPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke={isDarkMode ? '#0f172a' : '#ffffff'} />)}
                     </Pie>
                     <Tooltip cursor={{ fill: 'transparent' }} content={() => null} />
                     <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase'}} />

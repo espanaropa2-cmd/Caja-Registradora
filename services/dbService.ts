@@ -432,7 +432,8 @@ export const dbService = {
       lastPaymentRef: p.last_payment_ref,
       archived: p.archived,
       role: p.role || 'user',
-      useParallelRate: p.use_parallel_rate || false
+      useParallelRate: p.use_parallel_rate || false,
+      isDarkMode: p.is_dark_mode || false
     }));
   },
 
@@ -452,6 +453,7 @@ export const dbService = {
     if (updates.lastPaymentRef !== undefined) dbUpdates.last_payment_ref = updates.lastPaymentRef;
     if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
     if (updates.useParallelRate !== undefined) dbUpdates.use_parallel_rate = updates.useParallelRate;
+    if (updates.isDarkMode !== undefined) dbUpdates.is_dark_mode = updates.isDarkMode;
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', profileId);
     if (error) throw error;
