@@ -12,37 +12,48 @@ export interface BCVResponse {
 }
 
 export const fetchExchangeRate = async (type: 'oficial' | 'paralelo' = 'oficial'): Promise<number> => {
-  console.log(`[ExchangeService] Fetching rate: ${type}...`);
+  console.log(`[ExchangeService] Start fetching rate: ${type}`);
   
   try {
-    // Detectar la base URL para llamadas API
-    // Si estamos en un entorno donde window.location.origin es válido (Web/PWA), lo usamos.
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const apiUrl = `${baseUrl}/api/tasa-bcv?type=${type}`;
+    // 1. INTENTO VÍA PROXY LOCAL (Servidor Express)
+    let baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const apiUrl = `${baseUrl.replace(/\/$/, '')}/api/tasa-bcv?type=${type}`;
     
-    console.log(`[ExchangeService] Requesting: ${apiUrl}`);
-
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache'
+    try {
+      console.log(`[ExchangeService] Tier 1: Local Proxy (${apiUrl})`);
+      const response = await fetch(apiUrl, { timeout: 8000 } as any);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.rate) {
+          console.log(`[ExchangeService] Success via Local Proxy: ${data.rate}`);
+          return data.rate;
+        }
       }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.rate) {
-        console.log(`[ExchangeService] Rate resolved for ${type}: ${data.rate} (${data.source || 'server'})`);
-        return data.rate;
-      }
+    } catch (e) {
+      console.warn(`[ExchangeService] Local Proxy failed, trying Tier 2...`);
     }
-    
-    const errorText = await response.text().catch(() => 'No error detail');
-    console.warn(`[ExchangeService] API failed (Status: ${response.status}). Detail: ${errorText}. Using fallback.`);
+
+    // 2. INTENTO DIRECTO A API EXTERNA (Fallback de cliente)
+    // DolarAPI suele permitir CORS, así que podemos llamarla directamente si el servidor falla
+    try {
+      const directUrl = `https://ve.dolarapi.com/v1/dolares/${type === 'paralelo' ? 'paralelo' : 'bcv'}`;
+      console.log(`[ExchangeService] Tier 2: Direct External API (${directUrl})`);
+      const directRes = await fetch(directUrl, { timeout: 5000 } as any);
+      if (directRes.ok) {
+        const directData = await directRes.json();
+        if (directData && directData.promedio) {
+          console.log(`[ExchangeService] Success via Direct API: ${directData.promedio}`);
+          return directData.promedio;
+        }
+      }
+    } catch (e) {
+      console.warn(`[ExchangeService] Direct API failed, using Tier 3 (Static Fallback).`);
+    }
+
+    // 3. FALLBACK ESTÁTICO
     return type === 'paralelo' ? 44.50 : 36.55;
   } catch (error) {
-    console.error(`[ExchangeService] Connection error fetching ${type}:`, error);
-    // Probable error de CORS o red. Retornamos valor estático.
+    console.error(`[ExchangeService] Critical error:`, error);
     return type === 'paralelo' ? 44.50 : 36.55;
   }
 };
