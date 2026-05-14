@@ -6,7 +6,11 @@ import { fetchExchangeRate } from '../services/exchangeService';
 import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, ScanLine, UserPlus, Loader2, X, ChevronDown, Camera, Check, Landmark, Smartphone, Banknote } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 
-const SalesView: React.FC = () => {
+interface SalesViewProps {
+  useParallelRate?: boolean;
+}
+
+const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [cart, setCart] = useState<SaleItem[]>([]);
@@ -29,24 +33,29 @@ const SalesView: React.FC = () => {
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastProcessedRef = useRef<number>(0);
+  const rateLoadedRef = useRef(false);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [p, c, r] = await Promise.all([
+        const [p, c] = await Promise.all([
           dbService.getProducts(), 
-          dbService.getClients(),
-          fetchExchangeRate()
+          dbService.getClients()
         ]);
         setProducts(p);
         setClients(c);
-        setRate(r);
+        
+        if (!rateLoadedRef.current) {
+          const r = await fetchExchangeRate(useParallelRate ? 'paralelo' : 'oficial');
+          setRate(r);
+          rateLoadedRef.current = true;
+        }
       } catch (err) {
         console.error("Error loading sales data:", err);
       }
     };
     loadData();
-  }, []);
+  }, [useParallelRate]);
 
   useEffect(() => {
     let isMounted = true;

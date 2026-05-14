@@ -1,13 +1,22 @@
 -- SCRIPT DE CONFIGURACIÓN COMPLETO PARA SUPABASE
 -- Copia y pega este código en el SQL Editor de tu proyecto de Supabase y presiona "Run"
 
--- 1. Asegurar columnas necesarias en la tabla de perfiles
+-- 1. Asegurar todas las columnas necesarias en la tabla de perfiles
+-- Ejecuta esto una por una si prefieres, o todo el bloque
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS business_name TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS alias TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS contact_phone TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_payment_ref TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_expires TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sheets_url TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS use_parallel_rate BOOLEAN DEFAULT FALSE;
 
 -- 2. Asignar rol de administrador al superusuario
--- REEMPLAZA EL EMAIL SI ES DIFERENTE
 UPDATE profiles SET role = 'admin' WHERE email = 'azliersylver@gmail.com';
+UPDATE profiles SET role = 'admin' WHERE email = 'freddreds96@gmail.com'; -- También para el usuario actual si aplica
 
 -- 3. Crear la tabla de configuración global (Datos de Pago)
 CREATE TABLE IF NOT EXISTS app_config (

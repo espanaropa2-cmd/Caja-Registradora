@@ -431,7 +431,8 @@ export const dbService = {
       contactPhone: p.contact_phone,
       lastPaymentRef: p.last_payment_ref,
       archived: p.archived,
-      role: p.role || 'user'
+      role: p.role || 'user',
+      useParallelRate: p.use_parallel_rate || false
     }));
   },
 
@@ -450,6 +451,7 @@ export const dbService = {
     if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
     if (updates.lastPaymentRef !== undefined) dbUpdates.last_payment_ref = updates.lastPaymentRef;
     if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
+    if (updates.useParallelRate !== undefined) dbUpdates.use_parallel_rate = updates.useParallelRate;
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', profileId);
     if (error) throw error;

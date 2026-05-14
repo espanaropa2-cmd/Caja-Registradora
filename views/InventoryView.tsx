@@ -6,7 +6,11 @@ import { fetchExchangeRate } from '../services/exchangeService';
 import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign, Tag, Landmark } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
-const InventoryView: React.FC = () => {
+interface InventoryViewProps {
+  useParallelRate?: boolean;
+}
+
+const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,15 +60,20 @@ const InventoryView: React.FC = () => {
 
   const getRate = async () => {
     setIsRateLoading(true);
-    const r = await fetchExchangeRate();
-    setRate(r);
-    setIsRateLoading(false);
+    try {
+      const r = await fetchExchangeRate(useParallelRate ? 'paralelo' : 'oficial');
+      setRate(r);
+    } catch (error) {
+      console.error("Error fetching rate for inventory:", error);
+    } finally {
+      setIsRateLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchProducts();
     getRate();
-  }, []);
+  }, [useParallelRate]);
 
   // Sincronizar estados al abrir el modal de edición
   useEffect(() => {

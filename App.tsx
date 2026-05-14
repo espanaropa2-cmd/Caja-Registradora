@@ -20,7 +20,8 @@ import {
   Store,
   Loader2,
   X,
-  CreditCard as CreditIcon
+  CreditCard as CreditIcon,
+  ShieldAlert
 } from 'lucide-react';
 import { ViewType, UserProfile } from './types';
 import DashboardView from './views/DashboardView';
@@ -69,7 +70,8 @@ const App: React.FC = () => {
           isBanned: data.is_banned,
           alias: data.alias,
           contactPhone: data.contact_phone,
-          lastPaymentRef: data.last_payment_ref
+          lastPaymentRef: data.last_payment_ref,
+          useParallelRate: data.use_parallel_rate || false
         };
         setProfile(newProfile);
         localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
@@ -227,14 +229,14 @@ const App: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'dashboard': return <DashboardView />;
-      case 'inventory': return <InventoryView />;
-      case 'sales': return <SalesView />;
+      case 'dashboard': return <DashboardView useParallelRate={profile.useParallelRate} />;
+      case 'inventory': return <InventoryView useParallelRate={profile.useParallelRate} />;
+      case 'sales': return <SalesView useParallelRate={profile.useParallelRate} />;
       case 'sales_history': return <SalesHistoryView />;
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView />;
       case 'expenses': return <ExpensesView />;
-      case 'admin': return isSuperUser ? <AdminView /> : <DashboardView />;
+      case 'admin': return isSuperUser ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} />;
       case 'settings': return <SettingsView user={profile} onUpdateUser={async (p) => {
         setProfile(p);
         localStorage.setItem('cajapro_profile', JSON.stringify(p));
@@ -242,7 +244,8 @@ const App: React.FC = () => {
         await supabase.from('profiles').update({
           business_name: p.businessName,
           email: p.email,
-          sheets_url: p.sheetsUrl
+          sheets_url: p.sheetsUrl,
+          use_parallel_rate: p.useParallelRate
         }).eq('id', p.id);
       }} />;
       default: return <DashboardView />;

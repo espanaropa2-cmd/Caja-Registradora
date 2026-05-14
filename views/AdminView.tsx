@@ -17,7 +17,7 @@ import {
   Building,
   CreditCard,
   Save,
-  IdentificationIcon,
+  IdCard,
   CircleDollarSign,
   PlusCircle,
   XCircle,

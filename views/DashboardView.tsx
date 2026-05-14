@@ -56,7 +56,11 @@ const renderActiveShape = (props: any) => {
   );
 };
 
-const DashboardView: React.FC = () => {
+interface DashboardViewProps {
+  useParallelRate?: boolean;
+}
+
+const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false }) => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [products, setProducts] = useState<Product[]>([]);

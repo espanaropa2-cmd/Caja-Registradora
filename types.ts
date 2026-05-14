@@ -29,6 +29,7 @@ export interface UserProfile {
   lastPaymentRef?: string;
   archived?: boolean;
   role?: 'admin' | 'user';
+  useParallelRate?: boolean;
 }
 
 export interface AppConfig {

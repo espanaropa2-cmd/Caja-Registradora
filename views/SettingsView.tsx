@@ -13,10 +13,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
   const [formData, setFormData] = useState({
     businessName: user.businessName,
     email: user.email,
-    sheetsUrl: user.sheetsUrl || ''
+    sheetsUrl: user.sheetsUrl || '',
+    useParallelRate: user.useParallelRate || false
   });
 
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
+  const [rates, setRates] = useState<{ oficial: number; paralelo: number }>({ oficial: 0, paralelo: 0 });
   const [rate, setRate] = useState<number>(0);
   const [paymentData, setPaymentData] = useState({
     months: 1,
@@ -26,17 +28,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   useEffect(() => {
-    dbService.getAppConfig().then(setAppConfig);
-    import('../services/exchangeService').then(m => m.fetchExchangeRate().then(setRate));
-  }, []);
+    dbService.getAppConfig().then(config => {
+      setAppConfig(config);
+      import('../services/exchangeService').then(m => {
+        Promise.all([
+          m.fetchExchangeRate('oficial'),
+          m.fetchExchangeRate('paralelo')
+        ]).then(([oficial, paralelo]) => {
+          setRates({ oficial, paralelo });
+          // Seteamos la tasa general para el resto de la vista de configuración
+          setRate(user.useParallelRate ? paralelo : oficial);
+        });
+      });
+    });
+  }, [user.useParallelRate]);
 
-  const calculatePrice = (months: number) => {
-    if (months === 12) return 100;
-    return months * 10;
+  const calculateDisplayPrices = () => {
+    const months = paymentData.months;
+    const effectiveMonths = months === 12 ? 10 : months;
+    
+    const totalPriceUsd = 12 * effectiveMonths;
+    const oficialRate = rates.oficial || 36.55;
+    const totalPriceVes = totalPriceUsd * oficialRate;
+
+    return {
+      usd: totalPriceUsd,
+      ves: totalPriceVes
+    };
   };
 
-  const totalPriceUsd = calculatePrice(paymentData.months);
-  const totalPriceVes = rate > 0 ? totalPriceUsd * rate : 0;
+  const { usd: totalPriceUsd, ves: totalPriceVes } = calculateDisplayPrices();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,9 +158,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
                 <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-3 flex flex-col items-center justify-center">
                   <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total a Pagar</p>
                   <div className="flex flex-col items-center">
-                    <span className="text-xl font-black text-emerald-700">${totalPriceUsd.toLocaleString()}</span>
-                    {rate > 0 && paymentData.method === 'Pago Móvil' && (
-                      <span className="text-[10px] font-bold text-emerald-500">Bs. {totalPriceVes.toLocaleString()}</span>
+                    <span className="text-xl font-black text-emerald-700">${totalPriceUsd.toFixed(2)}</span>
+                    {rates.oficial > 0 && paymentData.method === 'Pago Móvil' && (
+                      <span className="text-[10px] font-bold text-emerald-500">Bs. {totalPriceVes.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     )}
                   </div>
                 </div>
@@ -195,6 +216,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
                 value={formData.email}
                 onChange={e => setFormData({...formData, email: e.target.value})}
               />
+            </div>
+          </div>
+          
+          <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tasa de Cambio Preferida</label>
+              <p className="text-xs text-slate-500 font-medium ml-1">Decide si tus precios se calculan a tasa oficial BCV o Paralela.</p>
+            </div>
+            <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+              <span className={`text-[10px] font-black uppercase tracking-widest ${!formData.useParallelRate ? 'text-blue-600' : 'text-slate-400'}`}>Oficial BCV</span>
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, useParallelRate: !formData.useParallelRate})}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.useParallelRate ? 'bg-amber-500' : 'bg-blue-600'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.useParallelRate ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${formData.useParallelRate ? 'text-amber-600' : 'text-slate-400'}`}>Paralelo</span>
             </div>
           </div>
         </div>
