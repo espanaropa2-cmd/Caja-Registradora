@@ -12,24 +12,31 @@ export interface BCVResponse {
 }
 
 export const fetchExchangeRate = async (type: 'oficial' | 'paralelo' = 'oficial'): Promise<number> => {
+  console.log(`[ExchangeService] Fetching rate: ${type}...`);
+  
   try {
-    const response = await fetch(`/api/tasa-bcv?type=${type}`);
+    // Si estamos en un entorno compilado (ej: app móvil), el path relativo /api/
+    // puede fallar si no hay un servidor local. 
+    const response = await fetch(`/api/tasa-bcv?type=${type}`, {
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      }
+    });
     
-    // Si la respuesta es JSON, intentamos usar el rate incluso si hay error (fallback del servidor)
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
+    if (response.ok) {
       const data = await response.json();
-      if (data.rate) {
-        if (!response.ok) console.warn("Using server-side fallback rate:", data.error);
+      if (data && data.rate) {
+        console.log(`[ExchangeService] Rate resolved for ${type}: ${data.rate} (${data.source || 'server'})`);
         return data.rate;
       }
     }
-
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     
-    return type === 'paralelo' ? 44.50 : 36.55; // Fallbacks extremos
+    console.warn(`[ExchangeService] API failed (Status: ${response.status}). Using fallback.`);
+    return type === 'paralelo' ? 44.50 : 36.55;
   } catch (error) {
-    console.error('Error fetching exchange rate:', error);
-    return type === 'paralelo' ? 44.50 : 36.55; // Valores de respaldo
+    console.error(`[ExchangeService] Connection error fetching ${type}:`, error);
+    // Probable error de CORS o red. Retornamos valor estático.
+    return type === 'paralelo' ? 44.50 : 36.55;
   }
 };

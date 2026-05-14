@@ -234,7 +234,7 @@ const App: React.FC = () => {
       case 'sales': return <SalesView useParallelRate={profile.useParallelRate} />;
       case 'sales_history': return <SalesHistoryView />;
       case 'clients': return <ClientsView />;
-      case 'credit': return <CreditView />;
+      case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;
       case 'expenses': return <ExpensesView />;
       case 'admin': return isSuperUser ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} />;
       case 'settings': return <SettingsView user={profile} onUpdateUser={async (p) => {

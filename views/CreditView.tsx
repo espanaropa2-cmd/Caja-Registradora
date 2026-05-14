@@ -4,7 +4,11 @@ import { dbService } from '../services/dbService';
 import { SaleStatus, Sale, Client, CreditPayment, PaymentMethod } from '../types';
 import { CreditCard, AlertCircle, RefreshCw, Loader2, DollarSign, CheckCircle2, Circle, Calendar, Hash, UserCircle, X, ChevronRight, History, Smartphone, Banknote } from 'lucide-react';
 
-const CreditView: React.FC = () => {
+interface CreditViewProps {
+  useParallelRate?: boolean;
+}
+
+const CreditView: React.FC<CreditViewProps> = ({ useParallelRate = false }) => {
   const [allClientsForLookup, setAllClientsForLookup] = useState<Client[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -23,7 +27,7 @@ const CreditView: React.FC = () => {
   // Derived in-memory value in USD for processing
   const abonoAmountInUSD = useMemo(() => {
     const num = Number(abonoAmountStr || 0);
-    return abonoAmountMode === 'USD' ? num : num / rate;
+    return abonoAmountMode === 'USD' ? num : num / (rate || 1);
   }, [abonoAmountStr, abonoAmountMode, rate]);
 
   const fetchData = async () => {
@@ -32,7 +36,7 @@ const CreditView: React.FC = () => {
         dbService.getSales(),
         dbService.getClients(),
         dbService.getCreditPayments(),
-        import('../services/exchangeService').then(m => m.fetchExchangeRate())
+        import('../services/exchangeService').then(m => m.fetchExchangeRate(useParallelRate ? 'paralelo' : 'oficial'))
       ]);
       setSales(allSales.filter(s => s.status === SaleStatus.CREDIT && (s.total - s.amountPaid) > 0));
       setAllClientsForLookup(allClients); // Guardar todos para búsqueda de nombres
@@ -46,7 +50,7 @@ const CreditView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [useParallelRate]);
 
   const handleRegisterAbono = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

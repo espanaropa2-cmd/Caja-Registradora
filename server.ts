@@ -1,94 +1,82 @@
 import express from "express";
 import path from "path";
-import { fileURLToPath } from "url";
+import cors from "cors";
+import axios from "axios";
 
 // Allow fetching from sites with self-signed or incomplete certificates (like the BCV site)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Habilitar CORS para permitir peticiones desde apps móviles o web compiladas
+  app.use(cors());
+  app.use(express.json());
+
   // Proxy route for BCV Exchange Rate
   app.get("/api/tasa-bcv", async (req, res) => {
     const type = req.query.type === 'paralelo' ? 'paralelo' : 'oficial';
+    const forceFallback = req.query.fallback === 'true';
+
+    if (forceFallback) {
+      return res.json({ rate: type === 'paralelo' ? 44.50 : 36.55, source: 'manual-fallback' });
+    }
     
     try {
-      // 1. DolarAPI (Uso prioritario como pidió el usuario)
+      // 1. DolarAPI (Uso prioritario)
       try {
-        console.warn(`Trying DolarAPI for ${type}...`);
-        const response = await fetch(`https://ve.dolarapi.com/v1/dolares/${type}`, {
-          signal: AbortSignal.timeout(12000)
-        });
-        if (response.ok) {
-          const data = await response.json();
-          // El usuario especificó usar "promedio"
-          if (data && data.promedio) return res.json({ rate: data.promedio, source: `dolarapi-${type}` });
+        const url = `https://ve.dolarapi.com/v1/dolares/${type}`;
+        console.log(`Fetching ${type} from DolarAPI...`);
+        const response = await axios.get(url, { timeout: 8000 });
+        if (response.data && response.data.promedio) {
+          return res.json({ rate: response.data.promedio, source: `dolarapi-${type}` });
         }
       } catch (e) {
-        console.warn(`DolarAPI ${type} failed:`, e instanceof Error ? e.message : e);
+        console.warn(`DolarAPI ${type} failed:`, e instanceof Error ? e.message : 'Unknown error');
       }
 
-      // Si falló DolarAPI y el usuario quería BCV, intentamos el raspado directo y otros fallbacks
-      if (type === 'oficial') {
-        try {
-          const response = await fetch('https://www.bcv.org.ve/', {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-              'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3'
-            },
-            signal: AbortSignal.timeout(15000)
-          });
-          
-          if (response.ok) {
-            const html = await response.text();
-            const match = html.match(/id="dolar"[^>]*>.*?<strong>\s*([\d,.]+)\s*<\/strong>/s);
-            if (match && match[1]) {
-              const rate = parseFloat(match[1].replace(',', '.'));
-              if (!isNaN(rate) && rate > 1) return res.json({ rate, source: 'bcv-direct' });
-            }
-          }
-        } catch (e) {
-          console.warn("BCV Direct scrape failed:", e instanceof Error ? e.message : e);
-        }
-
-        // CriptoDolar API (Backup para oficial)
-        try {
-          const response = await fetch('https://criptodolar.com/api/v1/latest?type=bcv', {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(12000)
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const bcvData = Array.isArray(data) ? data.find((i: any) => i.symbol === 'USD') : data;
-            if (bcvData && bcvData.price) return res.json({ rate: bcvData.price, source: 'criptodolar' });
-          }
-        } catch (e) {
-          console.warn("CriptoDolar failed:", e instanceof Error ? e.message : e);
-        }
-      }
-
-      // Si falló el paralelo en DolarAPI, intentamos PyDolar como backup para paralelo o oficial
+      // 2. PyDolar Venezuela (Excelente para Paralelo)
       try {
         const pyDolarTarget = type === 'paralelo' ? 'enparalelovzla' : 'bcv';
-        const response = await fetch(`https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=${pyDolarTarget}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(12000)
+        const url = `https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=${pyDolarTarget}`;
+        console.log(`Fetching ${type} from PyDolar...`);
+        const response = await axios.get(url, { 
+          timeout: 8000,
+          headers: { 'User-Agent': 'Mozilla/5.0' }
         });
-        if (response.ok) {
-          const data = await response.json();
-          const rate = data?.monitors?.usd?.price || data?.monitors?.bcv?.price || data?.monitors?.[pyDolarTarget]?.price;
-          if (rate) return res.json({ rate: parseFloat(String(rate)), source: 'pydolar' });
-        }
+        const rate = response.data?.monitors?.usd?.price || 
+                     response.data?.monitors?.bcv?.price || 
+                     response.data?.monitors?.[pyDolarTarget]?.price;
+        
+        if (rate) return res.json({ rate: parseFloat(String(rate)), source: 'pydolar' });
       } catch (e) {
-        console.warn("PyDolar fallback failed:", e instanceof Error ? e.message : e);
+        console.warn("PyDolar API failed:", e instanceof Error ? e.message : 'Unknown error');
+      }
+
+      // 3. BCV Direct Scrape (Solo para oficial)
+      if (type === 'oficial') {
+        try {
+          console.log("Attempting BCV direct scrape...");
+          const response = await axios.get('https://www.bcv.org.ve/', {
+            timeout: 10000,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            }
+          });
+          const html = response.data;
+          const match = html.match(/id="dolar"[^>]*>.*?<strong>\s*([\d,.]+)\s*<\/strong>/s);
+          if (match && match[1]) {
+            const rate = parseFloat(match[1].replace(',', '.'));
+            if (!isNaN(rate) && rate > 1) return res.json({ rate, source: 'bcv-direct' });
+          }
+        } catch (e) {
+          console.warn("BCV Scrape failed");
+        }
       }
 
       // Final fallback
+      console.warn(`All live sources failed for ${type}. Using static fallback.`);
       return res.json({ 
         rate: type === 'paralelo' ? 44.50 : 36.55, 
         source: 'static-fallback', 
@@ -97,23 +85,23 @@ async function startServer() {
 
     } catch (globalError) {
       console.error('Critical failure in /api/tasa-bcv:', globalError);
-      res.json({ rate: 36.55, error: 'Internal fetch error' });
+      res.json({ rate: type === 'paralelo' ? 44.50 : 36.55, error: 'Internal fetch error' });
     }
   });
 
   // Proxy route for legacy support
   app.get("/api/exchange-rate", async (req, res) => {
     try {
-      const response = await fetch('https://ve.dolarapi.com/v1/dolares/bcv');
-      if (response.ok) {
-        const data = await response.json();
-        res.json(data);
-      } else {
-        res.status(502).json({ error: 'Source returned error' });
-      }
+      const response = await axios.get('https://ve.dolarapi.com/v1/dolares/bcv', { timeout: 8000 });
+      res.json(response.data);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch exchange rate' });
     }
+  });
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", environment: process.env.NODE_ENV });
   });
 
   // Vite middleware for development
@@ -127,6 +115,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
+    // SPA catch-all (Express 5 compatible)
     app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
@@ -137,4 +126,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("Critical failure during server startup:", err);
+  process.exit(1);
+});
