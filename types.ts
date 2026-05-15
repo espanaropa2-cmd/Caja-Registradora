@@ -30,6 +30,7 @@ export interface UserProfile {
   archived?: boolean;
   role?: 'admin' | 'user';
   useParallelRate?: boolean;
+  showTriplePrice?: boolean;
   isDarkMode?: boolean;
 }
 

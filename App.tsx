@@ -77,6 +77,7 @@ const App: React.FC = () => {
           contactPhone: data.contact_phone,
           lastPaymentRef: data.last_payment_ref,
           useParallelRate: data.use_parallel_rate || false,
+          showTriplePrice: data.show_triple_price || false,
           isDarkMode: data.is_dark_mode || false
         };
         setProfile(newProfile);
@@ -281,7 +282,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'dashboard': return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'inventory': return <InventoryView useParallelRate={profile.useParallelRate} />;
-      case 'sales': return <SalesView useParallelRate={profile.useParallelRate} />;
+      case 'sales': return <SalesView useParallelRate={profile.useParallelRate} showTriplePrice={profile.showTriplePrice} />;
       case 'sales_history': return <SalesHistoryView />;
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;

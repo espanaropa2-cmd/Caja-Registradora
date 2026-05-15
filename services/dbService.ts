@@ -114,6 +114,25 @@ export const dbService = {
     if (error) throw error;
   },
 
+  async saveProductsBatch(products: Partial<Product>[]) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Sesión expirada");
+
+    const productsData = products.map(p => ({
+      id: p.id || generateUUID(),
+      name: p.name,
+      price: Number(p.price) || 0,
+      cost: Number(p.cost) || 0,
+      stock: Number(p.stock) || 0,
+      barcode: p.barcode || '',
+      category: p.category || 'General',
+      user_id: user.id
+    }));
+
+    const { error } = await supabase.from('products').upsert(productsData);
+    if (error) throw error;
+  },
+
   // Egresos (Refactorizado para evitar error de columna 'category')
   async getExpenses(): Promise<Expense[]> {
     const { data, error } = await supabase
@@ -182,6 +201,26 @@ export const dbService = {
 
   async deleteExpense(id: string) {
     const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async saveExpensesBatch(expenses: Partial<Expense>[]) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Sesión expirada");
+
+    const expensesData = expenses.map(e => {
+      const category = e.category || 'Otros';
+      const prefix = category === 'Reabastecimiento' ? REAB_PREFIX : OTRO_PREFIX;
+      return {
+        id: e.id || generateUUID(),
+        description: prefix + (e.description || 'Gasto Migrado'),
+        amount: Number(e.amount) || 0,
+        user_id: user.id,
+        date: e.date || new Date().toISOString()
+      };
+    });
+
+    const { error } = await supabase.from('expenses').upsert(expensesData);
     if (error) throw error;
   },
 
@@ -286,6 +325,41 @@ export const dbService = {
       if (client) await supabase.from('clients').update({ current_debt: client.current_debt + pending }).eq('id', sale.clientId);
     }
     return newSale;
+  },
+
+  async importSalesBatch(sales: (Partial<Sale> & { clientName?: string })[]) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Sesión expirada");
+
+    // 1. Get or create clients
+    const clientNames = [...new Set(sales.map(s => s.clientName).filter(Boolean))];
+    const existingClients = await this.getClients();
+    const clientMap: Record<string, string> = {};
+    
+    for (const name of clientNames) {
+      const existing = existingClients.find(c => c.name.toLowerCase() === name?.toLowerCase());
+      if (existing) {
+        clientMap[name!] = existing.id;
+      } else {
+        const newClient = await this.saveClient({ name: name! });
+        clientMap[name!] = newClient.id;
+      }
+    }
+
+    // 2. Prepare sales data
+    const salesData = sales.map(s => ({
+      id: s.id || generateUUID(),
+      user_id: user.id,
+      client_id: s.clientName ? clientMap[s.clientName] : s.clientId,
+      total: Number(s.total) || 0,
+      amount_paid: Number(s.amountPaid) || 0,
+      status: s.status || SaleStatus.COMPLETED,
+      items: s.items || [],
+      date: s.date || new Date().toISOString()
+    }));
+
+    const { error } = await supabase.from('sales').upsert(salesData);
+    if (error) throw error;
   },
 
   // Fix: Added deleteSale method with reverse inventory and debt logic
@@ -433,6 +507,7 @@ export const dbService = {
       archived: p.archived,
       role: p.role || 'user',
       useParallelRate: p.use_parallel_rate || false,
+      showTriplePrice: p.show_triple_price || false,
       isDarkMode: p.is_dark_mode || false
     }));
   },
@@ -453,6 +528,7 @@ export const dbService = {
     if (updates.lastPaymentRef !== undefined) dbUpdates.last_payment_ref = updates.lastPaymentRef;
     if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
     if (updates.useParallelRate !== undefined) dbUpdates.use_parallel_rate = updates.useParallelRate;
+    if (updates.showTriplePrice !== undefined) dbUpdates.show_triple_price = updates.showTriplePrice;
     if (updates.isDarkMode !== undefined) dbUpdates.is_dark_mode = updates.isDarkMode;
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', profileId);

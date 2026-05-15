@@ -3,8 +3,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product } from '../types';
 import { fetchExchangeRate } from '../services/exchangeService';
-import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign, Tag, Landmark } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Package, RefreshCw, Loader2, Calculator, X, AlertTriangle, ChevronDown, Barcode, Download, ArrowUpRight, DollarSign, Tag, Landmark, FileUp, FileText } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
+import Papa from 'papaparse';
 
 interface InventoryViewProps {
   useParallelRate?: boolean;
@@ -17,10 +18,66 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
   const [isReplenishOpen, setIsReplenishOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForBarcode, setProductForBarcode] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const downloadInventoryTemplate = () => {
+    const csvContent = "Nombre,Precio,Costo,Stock,Categoria,CodigoBarra\nEjemplo Producto,10.50,7.00,100,Bebidas,123456789";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "plantilla_inventario.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleInventoryCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const mappedProducts = results.data.map((row: any) => ({
+            name: row.Nombre || row.name,
+            price: parseFloat(row.Precio || row.price || '0'),
+            cost: parseFloat(row.Costo || row.cost || '0'),
+            stock: parseFloat(row.Stock || row.stock || '0'),
+            category: row.Categoria || row.category || 'General',
+            barcode: row.CodigoBarra || row.barcode || ''
+          })).filter(p => p.name);
+
+          if (mappedProducts.length === 0) {
+            alert("No se encontraron productos válidos en el CSV. Verifique el formato.");
+            setImporting(false);
+            return;
+          }
+
+          await dbService.saveProductsBatch(mappedProducts);
+          await fetchProducts();
+          setIsMigrationModalOpen(false);
+          alert(`¡Éxito! Se importaron ${mappedProducts.length} productos.`);
+        } catch (err) {
+          console.error(err);
+          alert("Error al procesar el archivo CSV. Asegúrese de que el formato sea correcto.");
+        } finally {
+          setImporting(false);
+          if (e.target) e.target.value = '';
+        }
+      }
+    });
+  };
+
   const [rate, setRate] = useState<number>(0);
   const [bsInput, setBsInput] = useState<string>('');
   const [isRateLoading, setIsRateLoading] = useState(false);
@@ -298,12 +355,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
           <h1 className="text-2xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Inventario</h1>
           <p className="text-xs lg:text-lg text-slate-500 dark:text-slate-400 font-medium">Gestión avanzada de costos y stock.</p>
         </div>
-        <button 
-          onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
-          className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-sm active:scale-95 border border-slate-800 dark:border-blue-500/30"
-        >
-          <Plus size={18} /> Registrar Producto
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={() => setIsMigrationModalOpen(true)}
+            className="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-800"
+          >
+            <FileUp size={18} /> Migrar CSV
+          </button>
+          <button 
+            onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
+            className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-sm active:scale-95 border border-slate-800 dark:border-blue-500/30"
+          >
+            <Plus size={18} /> Registrar Producto
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -323,7 +388,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
               <RefreshCw size={16} className={isRateLoading ? 'animate-spin' : ''} />
             </div>
             <div>
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">Tasa {useParallelRate ? 'Paralela' : 'BCV'}</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">Tasa {useParallelRate ? 'Paralelo' : 'BCV'}</p>
               <p className="text-sm font-black text-white dark:text-slate-100 mt-1">1 USD = {rate.toLocaleString()} BS</p>
             </div>
           </div>
@@ -475,7 +540,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                       >
                         <RefreshCw size={10} className={isRateLoading ? 'animate-spin' : ''} /> Actualizar Tasa
                       </button>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Tasa BCV: {rate.toLocaleString()} Bs/$</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">{useParallelRate ? 'Tasa Paralelo' : 'Tasa BCV'}: {rate.toLocaleString()} Bs/$</p>
                     </div>}
                   </div>
                 </div>
@@ -655,7 +720,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                   >
                     <RefreshCw size={10} className={isRateLoading ? 'animate-spin' : ''} /> Actualizar Tasa
                   </button>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Tasa BCV: {rate.toLocaleString()} Bs/$</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">{useParallelRate ? 'Tasa Paralelo' : 'Tasa BCV'}: {rate.toLocaleString()} Bs/$</p>
                 </div>}
               </div>
               <div className="bg-slate-900 rounded-2xl p-5 text-white">
@@ -707,6 +772,51 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
               {loading ? <Loader2 className="animate-spin" /> : 'Confirmar Entrada'}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Modal de Migración CSV */}
+      {isMigrationModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsMigrationModalOpen(false)} />
+          <div className="relative bg-white dark:bg-[#0f172a] w-full max-w-md rounded-[3rem] p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <FileUp size={40} />
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-2 uppercase">Migrar Inventario</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">
+              Sube un archivo CSV con tus productos. Asegúrate de seguir el formato de la plantilla.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <button 
+                onClick={downloadInventoryTemplate}
+                className="w-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all border border-slate-200 dark:border-slate-700"
+              >
+                <FileText size={18} /> Descargar Plantilla
+              </button>
+              
+              <label className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 cursor-pointer shadow-xl shadow-blue-500/20 transition-all active:scale-95">
+                {importing ? <Loader2 className="animate-spin" size={20} /> : <FileUp size={20} />}
+                {importing ? 'Procesando...' : 'Seleccionar Archivo .CSV'}
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  className="hidden" 
+                  onChange={handleInventoryCSV} 
+                  disabled={importing}
+                />
+              </label>
+
+              <button 
+                onClick={() => setIsMigrationModalOpen(false)}
+                className="text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-widest mt-2 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

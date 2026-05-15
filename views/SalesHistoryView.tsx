@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/dbService';
-import { Sale, Client } from '../types';
-import { History, Calendar, Search, Trash2, ArrowUpRight, ShoppingBag, User, Loader2, X, AlertTriangle, RefreshCw, DollarSign } from 'lucide-react';
+import { Sale, Client, SaleStatus } from '../types';
+import { History, Calendar, Search, Trash2, ArrowUpRight, ShoppingBag, User, Loader2, X, AlertTriangle, RefreshCw, DollarSign, FileUp, FileText } from 'lucide-react';
+import Papa from 'papaparse';
 
 type TimeRange = 'hoy' | 'semana' | 'mes' | 'año' | 'todos';
 
@@ -12,6 +13,61 @@ const SalesHistoryView: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('semana');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
+
+  const downloadSalesTemplate = () => {
+    const csvContent = "Fecha,Cliente,Total,Pagado,Estado\n2024-05-15,Juan Perez,150.00,150.00,COMPLETED\n2024-05-14,Maria Gomez,200.00,50.00,CREDIT";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "plantilla_ventas.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSalesCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const mappedSales = results.data.map((row: any) => ({
+            date: row.Fecha || row.date || new Date().toISOString(),
+            clientName: row.Cliente || row.client,
+            total: parseFloat(row.Total || row.total || '0'),
+            amountPaid: parseFloat(row.Pagado || row.amountPaid || '0'),
+            status: (row.Estado || row.status || 'COMPLETED') as SaleStatus,
+            items: [] // Migrated sales usually don't have item details in simple CSV
+          })).filter(s => s.total > 0);
+
+          if (mappedSales.length === 0) {
+            alert("No se encontraron ventas válidas en el CSV.");
+            setImporting(false);
+            return;
+          }
+
+          await dbService.importSalesBatch(mappedSales);
+          await fetchData();
+          setIsMigrationModalOpen(false);
+          alert(`¡Éxito! Se importaron ${mappedSales.length} ventas.`);
+        } catch (err) {
+          console.error(err);
+          alert("Error al procesar el archivo CSV.");
+        } finally {
+          setImporting(false);
+          if (e.target) e.target.value = '';
+        }
+      }
+    });
+  };
   
   // Estados para el modal de confirmación
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -110,13 +166,21 @@ const SalesHistoryView: React.FC = () => {
           <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Historial de Operaciones</h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium">Control y auditoría de ventas registradas.</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl">
-            <ShoppingBag size={20} />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Facturación Periodo</p>
-            <p className="text-xl font-black text-slate-800 dark:text-slate-100">${totals.toLocaleString()}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={() => setIsMigrationModalOpen(true)}
+            className="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-800"
+          >
+            <FileUp size={18} /> Migrar CSV
+          </button>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl">
+              <ShoppingBag size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Facturación Periodo</p>
+              <p className="text-xl font-black text-slate-800 dark:text-slate-100">${totals.toLocaleString()}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -294,6 +358,51 @@ const SalesHistoryView: React.FC = () => {
 
             
             <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] text-center">Seguridad de integridad de datos habilitada</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Migración CSV */}
+      {isMigrationModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsMigrationModalOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <FileUp size={40} />
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-2 uppercase">Migrar Ingresos (Ventas)</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">
+              Sube un archivo CSV con tus ventas históricas. Se crearán los clientes automáticamente si no existen.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <button 
+                onClick={downloadSalesTemplate}
+                className="w-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all border border-slate-200 dark:border-slate-700"
+              >
+                <FileText size={18} /> Descargar Plantilla
+              </button>
+              
+              <label className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 cursor-pointer shadow-xl shadow-blue-500/20 transition-all active:scale-95">
+                {importing ? <Loader2 className="animate-spin" size={20} /> : <FileUp size={20} />}
+                {importing ? 'Procesando...' : 'Seleccionar Archivo .CSV'}
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  className="hidden" 
+                  onChange={handleSalesCSV} 
+                  disabled={importing}
+                />
+              </label>
+
+              <button 
+                onClick={() => setIsMigrationModalOpen(false)}
+                className="text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-widest mt-2 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

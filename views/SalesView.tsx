@@ -8,9 +8,10 @@ import { Html5Qrcode } from "html5-qrcode";
 
 interface SalesViewProps {
   useParallelRate?: boolean;
+  showTriplePrice?: boolean;
 }
 
-const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
+const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTriplePrice = false }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [cart, setCart] = useState<SaleItem[]>([]);
@@ -29,6 +30,8 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
   const [processing, setProcessing] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
   const [rate, setRate] = useState<number>(0);
+  const [officialRate, setOfficialRate] = useState<number>(0);
+  const [parallelRate, setParallelRate] = useState<number>(0);
   const [showBs, setShowBs] = useState(false);
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -46,8 +49,18 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
         setClients(c);
         
         if (!rateLoadedRef.current) {
-          const r = await fetchExchangeRate(useParallelRate ? 'paralelo' : 'oficial');
-          setRate(r);
+          if (showTriplePrice) {
+            const [o, par] = await Promise.all([
+              fetchExchangeRate('oficial'),
+              fetchExchangeRate('paralelo')
+            ]);
+            setOfficialRate(o);
+            setParallelRate(par);
+            setRate(useParallelRate ? par : o);
+          } else {
+            const r = await fetchExchangeRate(useParallelRate ? 'paralelo' : 'oficial');
+            setRate(r);
+          }
           rateLoadedRef.current = true;
         }
       } catch (err) {
@@ -55,7 +68,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
       }
     };
     loadData();
-  }, [useParallelRate]);
+  }, [useParallelRate, showTriplePrice]);
 
   useEffect(() => {
     let isMounted = true;
@@ -243,7 +256,9 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
             <p className="text-xs lg:text-lg text-slate-500 dark:text-slate-400 font-medium">Realiza transacciones y créditos al instante.</p>
           </div>
           <div className="bg-white dark:bg-slate-900 px-6 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-end">
-            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Tasa BCV</span>
+            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">
+              {useParallelRate ? 'Tasa Paralelo' : 'Tasa BCV'}
+            </span>
             <span className="text-sm font-black text-blue-600 dark:text-blue-400">1 USD = {rate.toLocaleString()} BS</span>
           </div>
         </div>
@@ -279,7 +294,14 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                     </div>
                     <div className="text-right">
                       <p className="font-black text-slate-900 dark:text-white text-lg">${p.price.toLocaleString()}</p>
-                      {rate > 0 && <p className="text-[10px] font-bold text-slate-400">≈ Bs. {(p.price * rate).toLocaleString()}</p>}
+                      {showTriplePrice && officialRate > 0 && parallelRate > 0 ? (
+                        <div className="flex flex-col items-end">
+                           <p className="text-[11px] font-black text-blue-500 uppercase tracking-tighter">Mix: ${((p.price * parallelRate) / officialRate).toFixed(2)}</p>
+                           <p className="text-[11px] font-black text-emerald-500 uppercase tracking-tighter">Bs. {(p.price * rate).toLocaleString()}</p>
+                        </div>
+                      ) : (
+                        rate > 0 && <p className="text-[10px] font-bold text-slate-400">≈ Bs. {(p.price * rate).toLocaleString()}</p>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -354,28 +376,34 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
       </div>
 
       {/* Panel de Carrito */}
-      <div className={`fixed lg:static inset-0 z-[100] lg:z-0 lg:w-[450px] transform transition-transform duration-500 flex flex-col ${isCartVisible ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
+      <div className={`fixed lg:static inset-0 z-[100] lg:z-0 lg:w-[380px] xl:w-[420px] transform transition-transform duration-500 flex flex-col ${isCartVisible ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
         <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsCartVisible(false)} />
-        <div className="relative bg-white dark:bg-[#0f172a] h-[92vh] lg:h-full mt-auto lg:mt-0 rounded-t-[3rem] lg:rounded-[3rem] shadow-2xl flex flex-col lg:p-10 p-6 overflow-hidden border-l border-slate-100 dark:border-slate-800 transition-colors">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-500/30">
-                <ShoppingCart size={24} />
+        <div className="relative bg-white dark:bg-[#0f172a] h-[95vh] lg:h-full mt-auto lg:mt-0 rounded-t-[2.5rem] lg:rounded-[2.5rem] shadow-2xl flex flex-col lg:p-6 p-5 overflow-hidden border-l border-slate-100 dark:border-slate-800 transition-colors">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-500/30">
+                <ShoppingCart size={20} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Mi Carrito</h3>
-                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mt-1">{cart.length} Items seleccionados</p>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Mi Carrito</h3>
+                <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mt-1">{cart.length} Items seleccionados</p>
               </div>
             </div>
-            <button onClick={() => setIsCartVisible(false)} className="lg:hidden p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X size={28}/></button>
+            <button onClick={() => setIsCartVisible(false)} className="lg:hidden p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X size={24}/></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3 mb-8">
+          <div className="flex-1 overflow-y-auto hide-scrollbar space-y-2 mb-6">
             {cart.map(item => (
               <div key={item.productId} className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 flex items-center justify-between group">
                 <div className="flex-1 min-w-0 pr-4">
                   <p className="font-bold text-slate-900 dark:text-slate-100 truncate text-sm">{item.name}</p>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">${item.price.toLocaleString()} c/u</p>
+                  {showTriplePrice && officialRate > 0 && parallelRate > 0 && (
+                    <div className="flex flex-col mt-1 bg-slate-100 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                       <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase leading-none">Mixto: ${((item.price * parallelRate) / officialRate).toFixed(2)}</span>
+                       <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase leading-none mt-1.5">Bolívar: {(item.price * rate).toLocaleString()} Bs.</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2.5">
                   <button onClick={() => updateQuantity(item.productId, -1)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition-all shadow-sm border border-slate-100 dark:border-slate-700 active:scale-90"><Minus size={14}/></button>
@@ -392,126 +420,143 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
             )}
           </div>
 
-            <div className="space-y-4">
-              <div className="flex gap-2">
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setSaleStatus(SaleStatus.COMPLETED)}
+                className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 text-white shadow-lg' : 'bg-transparent border border-slate-200 dark:border-white/10 text-slate-400'}`}
+              >
+                Contado
+              </button>
+              <button 
+                onClick={() => setSaleStatus(SaleStatus.CREDIT)}
+                className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 text-white shadow-lg' : 'bg-transparent border border-slate-200 dark:border-white/10 text-slate-400'}`}
+              >
+                Crédito
+              </button>
+            </div>
+
+            {/* Selección de Método de Pago */}
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest ml-1">Método de Pago</label>
+              <div className="grid grid-cols-3 gap-2">
                 <button 
-                  onClick={() => setSaleStatus(SaleStatus.COMPLETED)}
-                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 text-white shadow-lg' : 'bg-transparent border border-slate-200 dark:border-white/10 text-slate-400'}`}
+                  onClick={() => setPaymentMethod(PaymentMethod.EFECTIVO)}
+                  className={`flex flex-col items-center justify-center py-2 rounded-xl border transition-all ${paymentMethod === PaymentMethod.EFECTIVO ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
                 >
-                  Contado
+                  <Banknote size={16} />
+                  <span className="text-[7px] font-black mt-1 uppercase">Efectivo</span>
                 </button>
                 <button 
-                  onClick={() => setSaleStatus(SaleStatus.CREDIT)}
-                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 text-white shadow-lg' : 'bg-transparent border border-slate-200 dark:border-white/10 text-slate-400'}`}
+                  onClick={() => setPaymentMethod(PaymentMethod.PUNTO)}
+                  className={`flex flex-col items-center justify-center py-2 rounded-xl border transition-all ${paymentMethod === PaymentMethod.PUNTO ? 'bg-blue-500 border-blue-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
                 >
-                  Crédito
+                  <CreditCard size={16} />
+                  <span className="text-[7px] font-black mt-1 uppercase">Punto</span>
+                </button>
+                <button 
+                  onClick={() => setPaymentMethod(PaymentMethod.PAGOMOVIL)}
+                  className={`flex flex-col items-center justify-center py-2 rounded-xl border transition-all ${paymentMethod === PaymentMethod.PAGOMOVIL ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
+                >
+                  <Smartphone size={16} />
+                  <span className="text-[7px] font-black mt-1 uppercase">Móvil</span>
                 </button>
               </div>
+            </div>
 
-              {/* Selección de Método de Pago */}
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest ml-1">Método de Pago</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button 
-                    onClick={() => setPaymentMethod(PaymentMethod.EFECTIVO)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.EFECTIVO ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
-                  >
-                    <Banknote size={20} />
-                    <span className="text-[8px] font-black mt-1 uppercase">Efectivo</span>
-                  </button>
-                  <button 
-                    onClick={() => setPaymentMethod(PaymentMethod.PUNTO)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PUNTO ? 'bg-blue-500 border-blue-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
-                  >
-                    <CreditCard size={20} />
-                    <span className="text-[8px] font-black mt-1 uppercase">Punto</span>
-                  </button>
-                  <button 
-                    onClick={() => setPaymentMethod(PaymentMethod.PAGOMOVIL)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PAGOMOVIL ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
-                  >
-                    <Smartphone size={20} />
-                    <span className="text-[8px] font-black mt-1 uppercase">Móvil</span>
-                  </button>
+            {paymentMethod === PaymentMethod.PAGOMOVIL && (
+               <div className="animate-in slide-in-from-top-2">
+                 <input 
+                  type="text" 
+                  placeholder="Referencia PagoMóvil (Opcional)" 
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl outline-none font-black text-xs text-slate-800 dark:text-white" 
+                  value={paymentRef} 
+                  onChange={(e) => setPaymentRef(e.target.value)} 
+                />
+               </div>
+            )}
+
+            {saleStatus === SaleStatus.CREDIT && (
+              <div className="animate-in slide-in-from-top-2">
+                <div className="flex justify-between items-center px-1 mb-1">
+                  <label className="text-[8px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest">Abono Inicial</label>
+                  {rate > 0 && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                         const currentUSD = amountPaidInUSD;
+                         const newMode = amountPaidMode === 'USD' ? 'VES' : 'USD';
+                         setAmountPaidMode(newMode);
+                         if (newMode === 'VES') {
+                           setAmountPaidStr(currentUSD === 0 ? '' : (currentUSD * rate).toFixed(2));
+                         } else {
+                           setAmountPaidStr(currentUSD === 0 ? '' : currentUSD.toFixed(2));
+                         }
+                      }}
+                      className={`text-[8px] font-black uppercase flex items-center gap-1 transition-all ${amountPaidMode === 'USD' ? 'text-blue-400' : 'text-emerald-400'}`}
+                    >
+                       Modo: {amountPaidMode === 'USD' ? '$' : 'Bs.'}
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    placeholder="0.00" 
+                    className={`w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl outline-none font-black text-sm transition-all ${amountPaidMode === 'USD' ? 'text-slate-800 dark:text-white' : 'text-emerald-400'}`} 
+                    value={amountPaidStr} 
+                    onFocus={() => isTypingAmountPaid.current = true}
+                    onBlur={() => isTypingAmountPaid.current = false}
+                    onChange={(e) => setAmountPaidStr(e.target.value)} 
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                     <p className={`text-[9px] font-black uppercase opacity-20 ${amountPaidMode === 'USD' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                       {amountPaidMode === 'USD' ? 'USD' : 'Bs.'}
+                     </p>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {paymentMethod === PaymentMethod.PAGOMOVIL && (
-                 <div className="animate-in slide-in-from-top-2">
-                   <input 
-                    type="text" 
-                    placeholder="Referencia PagoMóvil (Opcional)" 
-                    className="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none font-black text-slate-800 dark:text-white" 
-                    value={paymentRef} 
-                    onChange={(e) => setPaymentRef(e.target.value)} 
-                  />
-                 </div>
-              )}
-
-              {saleStatus === SaleStatus.CREDIT && (
-                <div className="animate-in slide-in-from-top-2">
-                  <div className="flex justify-between items-center px-1">
-                    <label className="text-[9px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest">Abono Inicial</label>
-                    {rate > 0 && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                           const currentUSD = amountPaidInUSD;
-                           const newMode = amountPaidMode === 'USD' ? 'VES' : 'USD';
-                           setAmountPaidMode(newMode);
-                           if (newMode === 'VES') {
-                             setAmountPaidStr(currentUSD === 0 ? '' : (currentUSD * rate).toFixed(2));
-                           } else {
-                             setAmountPaidStr(currentUSD === 0 ? '' : currentUSD.toFixed(2));
-                           }
-                        }}
-                        className={`text-[8px] font-black uppercase flex items-center gap-1 transition-all ${amountPaidMode === 'USD' ? 'text-blue-400' : 'text-emerald-400'}`}
-                      >
-                         Modo: {amountPaidMode === 'USD' ? 'USD ($)' : 'VES (Bs.)'}
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <input 
-                      type="number" 
-                      placeholder="0.00" 
-                      className={`w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none font-black transition-all ${amountPaidMode === 'USD' ? 'text-slate-800 dark:text-white' : 'text-emerald-400'}`} 
-                      value={amountPaidStr} 
-                      onFocus={() => isTypingAmountPaid.current = true}
-                      onBlur={() => isTypingAmountPaid.current = false}
-                      onChange={(e) => setAmountPaidStr(e.target.value)} 
-                    />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                       <p className={`text-[10px] font-black uppercase opacity-20 ${amountPaidMode === 'USD' ? 'text-blue-500' : 'text-emerald-500'}`}>
-                         {amountPaidMode === 'USD' ? 'USD' : 'Bs.'}
-                       </p>
+            <div className="flex items-center justify-between text-slate-800 dark:text-white px-1">
+              <span className="text-[9px] font-black uppercase tracking-widest opacity-50">Total</span>
+              <div className="flex flex-col items-end">
+                <span className="text-2xl font-black tracking-tighter">${total.toLocaleString()}</span>
+                
+                {showTriplePrice && officialRate > 0 && parallelRate > 0 && (
+                  <div className="flex flex-col items-end mt-2 space-y-1 bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 w-full mb-2">
+                    <div className="flex justify-between w-full items-baseline">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mixto</span>
+                      <p className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase tracking-tight">${((total * parallelRate) / officialRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="flex justify-between w-full items-baseline">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">En Bolívares</span>
+                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">Bs. {(total * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
-                </div>
-              )}
-            <div className="flex items-center justify-between text-slate-800 dark:text-white px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Total a Pagar</span>
-              <div className="flex flex-col items-end">
-                <span className="text-3xl font-black tracking-tighter">${total.toLocaleString()}</span>
-                {rate > 0 && (
+                )}
+
+                {rate > 0 && !showTriplePrice && (
                   <div className="flex flex-col items-end">
-                    <button 
-                      onClick={() => setShowBs(!showBs)}
-                      className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors"
-                    >
-                      <Landmark size={12} /> {showBs ? 'Cerrar Bs' : 'Ver en Bs'}
-                    </button>
-                    <button 
-                      onClick={async () => {
-                        const r = await fetchExchangeRate();
-                        setRate(r);
-                      }}
-                      className="text-[8px] font-black text-slate-500 uppercase tracking-tighter hover:text-slate-300 mt-1"
-                    >
-                      Actualizar Tasa
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setShowBs(!showBs)}
+                        className="text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors"
+                      >
+                        <Landmark size={10} /> {showBs ? 'Cerrar Bs' : 'Ver Bs'}
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          const r = await fetchExchangeRate();
+                          setRate(r);
+                        }}
+                        className="text-[7px] font-black text-slate-500 uppercase tracking-tighter hover:text-slate-300"
+                      >
+                        Actualizar
+                      </button>
+                    </div>
                     {showBs && (
-                      <span className="text-lg font-black text-emerald-400 animate-in slide-in-from-right-2">
+                      <span className="text-base font-black text-emerald-400 animate-in slide-in-from-right-2 mt-0.5">
                         Bs. {(total * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     )}
@@ -519,12 +564,13 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                 )}
               </div>
             </div>
+            
             <button 
               onClick={handleProcessSale}
               disabled={cart.length === 0 || processing}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white py-5 rounded-3xl font-black text-lg shadow-xl uppercase tracking-widest transition-all"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white py-4 rounded-2xl font-black text-base shadow-xl uppercase tracking-widest transition-all"
             >
-              {processing ? <Loader2 className="animate-spin mx-auto" size={24} /> : 'Finalizar Venta'}
+              {processing ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Finalizar Venta'}
             </button>
           </div>
         </div>

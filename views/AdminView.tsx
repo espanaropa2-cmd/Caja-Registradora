@@ -449,6 +449,25 @@ const AdminView: React.FC = () => {
 
                     {/* Acciones Rápidas */}
                     <div className="lg:col-span-4 flex flex-col justify-center space-y-3">
+                        {/* Función Triple Precio */}
+                        <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800 rounded-2xl group transition-all mb-1">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                              <CircleDollarSign size={16} />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-indigo-900 dark:text-indigo-200 uppercase tracking-tighter">Triple Precio</p>
+                              <p className="text-[8px] font-bold text-indigo-400 dark:text-indigo-500 uppercase tracking-widest whitespace-nowrap">USD + VES + Mixto</p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => handleUpdate(profile.id, { showTriplePrice: !profile.showTriplePrice })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${profile.showTriplePrice ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${profile.showTriplePrice ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+
                         <button 
                           onClick={() => handleUpdate(profile.id, { isBanned: !profile.isBanned })}
                           className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm ${profile.isBanned ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40'}`}

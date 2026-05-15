@@ -2,15 +2,69 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
 import { Expense, ExpenseCategory } from '../types';
-import { TrendingDown, Plus, DollarSign, Tag, Edit2, Trash2, Loader2, X, AlertTriangle, Layers } from 'lucide-react';
+import { TrendingDown, Plus, DollarSign, Tag, Edit2, Trash2, Loader2, X, AlertTriangle, Layers, FileUp, FileText } from 'lucide-react';
+import Papa from 'papaparse';
 
 const ExpensesView: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const downloadExpensesTemplate = () => {
+    const csvContent = "Descripcion,Monto,Categoria,Fecha\nPago de Alquiler,500.00,Otros,2024-05-15\nCompra de Mercancia,1200.50,Reabastecimiento,2024-05-14";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "plantilla_egresos.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExpensesCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const mappedExpenses = results.data.map((row: any) => ({
+            description: row.Descripcion || row.description,
+            amount: parseFloat(row.Monto || row.amount || '0'),
+            category: (row.Categoria || row.category || 'Otros') as ExpenseCategory,
+            date: row.Fecha || row.date || new Date().toISOString()
+          })).filter(e => e.description && e.amount > 0);
+
+          if (mappedExpenses.length === 0) {
+            alert("No se encontraron egresos válidos en el CSV.");
+            setImporting(false);
+            return;
+          }
+
+          await dbService.saveExpensesBatch(mappedExpenses);
+          await loadExpenses();
+          setIsMigrationModalOpen(false);
+          alert(`¡Éxito! Se importaron ${mappedExpenses.length} registros de egresos.`);
+        } catch (err) {
+          console.error(err);
+          alert("Error al procesar el archivo CSV.");
+        } finally {
+          setImporting(false);
+          if (e.target) e.target.value = '';
+        }
+      }
+    });
+  };
 
   useEffect(() => {
     loadExpenses();
@@ -93,12 +147,20 @@ const ExpensesView: React.FC = () => {
           <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Egresos & Gastos</h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium">Control operativo de salidas de capital.</p>
         </div>
-        <button 
-          onClick={() => { setEditingExpense(null); setIsModalOpen(true); }}
-          className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-rose-100 dark:shadow-none transition-all active:scale-95"
-        >
-          <Plus size={20} /> Registrar Gasto
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={() => setIsMigrationModalOpen(true)}
+            className="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-800"
+          >
+            <FileUp size={18} /> Migrar CSV
+          </button>
+          <button 
+            onClick={() => { setEditingExpense(null); setIsModalOpen(true); }}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-rose-100 dark:shadow-none transition-all active:scale-95"
+          >
+            <Plus size={20} /> Registrar Gasto
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -250,6 +312,51 @@ const ExpensesView: React.FC = () => {
               {loading ? <Loader2 className="animate-spin" /> : (editingExpense ? 'Actualizar Registro' : 'Registrar Egreso')}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Modal de Migración CSV */}
+      {isMigrationModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsMigrationModalOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+            <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <FileUp size={40} />
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-2 uppercase">Migrar Egresos</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">
+              Sube un archivo CSV con tus egresos históricos.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <button 
+                onClick={downloadExpensesTemplate}
+                className="w-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all border border-slate-200 dark:border-slate-700"
+              >
+                <FileText size={18} /> Descargar Plantilla
+              </button>
+              
+              <label className="w-full bg-rose-600 hover:bg-rose-700 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 cursor-pointer shadow-xl shadow-rose-500/20 transition-all active:scale-95">
+                {importing ? <Loader2 className="animate-spin" size={20} /> : <FileUp size={20} />}
+                {importing ? 'Procesando...' : 'Seleccionar Archivo .CSV'}
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  className="hidden" 
+                  onChange={handleExpensesCSV} 
+                  disabled={importing}
+                />
+              </label>
+
+              <button 
+                onClick={() => setIsMigrationModalOpen(false)}
+                className="text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-widest mt-2 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
