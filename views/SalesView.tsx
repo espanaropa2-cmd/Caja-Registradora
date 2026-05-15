@@ -396,13 +396,13 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
               <div className="flex gap-2">
                 <button 
                   onClick={() => setSaleStatus(SaleStatus.COMPLETED)}
-                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 text-white shadow-lg' : 'bg-transparent border border-slate-200 lg:border-white/10 text-slate-400'}`}
+                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.COMPLETED ? 'bg-blue-600 text-white shadow-lg' : 'bg-transparent border border-slate-200 dark:border-white/10 text-slate-400'}`}
                 >
                   Contado
                 </button>
                 <button 
                   onClick={() => setSaleStatus(SaleStatus.CREDIT)}
-                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 text-white shadow-lg' : 'bg-transparent border border-slate-200 lg:border-white/10 text-slate-400'}`}
+                  className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${saleStatus === SaleStatus.CREDIT ? 'bg-amber-500 text-white shadow-lg' : 'bg-transparent border border-slate-200 dark:border-white/10 text-slate-400'}`}
                 >
                   Crédito
                 </button>
@@ -410,25 +410,25 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
 
               {/* Selección de Método de Pago */}
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 lg:text-white/40 uppercase tracking-widest ml-1">Método de Pago</label>
+                <label className="text-[9px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest ml-1">Método de Pago</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button 
                     onClick={() => setPaymentMethod(PaymentMethod.EFECTIVO)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.EFECTIVO ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.EFECTIVO ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
                   >
                     <Banknote size={20} />
                     <span className="text-[8px] font-black mt-1 uppercase">Efectivo</span>
                   </button>
                   <button 
                     onClick={() => setPaymentMethod(PaymentMethod.PUNTO)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PUNTO ? 'bg-blue-500 border-blue-400 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PUNTO ? 'bg-blue-500 border-blue-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
                   >
                     <CreditCard size={20} />
                     <span className="text-[8px] font-black mt-1 uppercase">Punto</span>
                   </button>
                   <button 
                     onClick={() => setPaymentMethod(PaymentMethod.PAGOMOVIL)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PAGOMOVIL ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-transparent border-slate-200 lg:border-white/10 text-slate-400'}`}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${paymentMethod === PaymentMethod.PAGOMOVIL ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
                   >
                     <Smartphone size={20} />
                     <span className="text-[8px] font-black mt-1 uppercase">Móvil</span>
@@ -441,7 +441,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                    <input 
                     type="text" 
                     placeholder="Referencia PagoMóvil (Opcional)" 
-                    className="w-full px-5 py-4 bg-slate-50 lg:bg-white/5 border border-slate-200 lg:border-white/10 rounded-2xl outline-none font-black text-slate-800 lg:text-white" 
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none font-black text-slate-800 dark:text-white" 
                     value={paymentRef} 
                     onChange={(e) => setPaymentRef(e.target.value)} 
                   />
@@ -451,7 +451,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
               {saleStatus === SaleStatus.CREDIT && (
                 <div className="animate-in slide-in-from-top-2">
                   <div className="flex justify-between items-center px-1">
-                    <label className="text-[9px] font-black text-slate-400 lg:text-white/40 uppercase tracking-widest">Abono Inicial</label>
+                    <label className="text-[9px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest">Abono Inicial</label>
                     {rate > 0 && (
                       <button 
                         type="button"
@@ -475,7 +475,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                     <input 
                       type="number" 
                       placeholder="0.00" 
-                      className={`w-full px-5 py-4 bg-slate-50 lg:bg-white/5 border border-slate-200 lg:border-white/10 rounded-2xl outline-none font-black transition-all ${amountPaidMode === 'USD' ? 'text-slate-800 lg:text-white' : 'text-emerald-400'}`} 
+                      className={`w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none font-black transition-all ${amountPaidMode === 'USD' ? 'text-slate-800 dark:text-white' : 'text-emerald-400'}`} 
                       value={amountPaidStr} 
                       onFocus={() => isTypingAmountPaid.current = true}
                       onBlur={() => isTypingAmountPaid.current = false}
@@ -489,7 +489,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false }) => {
                   </div>
                 </div>
               )}
-            <div className="flex items-center justify-between text-slate-800 lg:text-white px-2">
+            <div className="flex items-center justify-between text-slate-800 dark:text-white px-2">
               <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Total a Pagar</span>
               <div className="flex flex-col items-end">
                 <span className="text-3xl font-black tracking-tighter">${total.toLocaleString()}</span>
