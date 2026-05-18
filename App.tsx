@@ -288,7 +288,7 @@ const App: React.FC = () => {
       case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;
       case 'expenses': return <ExpensesView />;
       case 'admin': return isAdmin ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
-      case 'settings': return <SettingsView user={profile} onUpdateUser={async (p) => {
+      case 'settings': return <SettingsView user={profile} onLogout={handleLogout} onUpdateUser={async (p) => {
         setProfile(p);
         localStorage.setItem('cajapro_profile', JSON.stringify(p));
         // Persistir en Supabase

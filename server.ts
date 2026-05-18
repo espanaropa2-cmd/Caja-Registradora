@@ -2,6 +2,8 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import axios from "axios";
+import nodemailer from "nodemailer";
+import { sendBalanceEmail } from "./services/emailService.ts";
 
 // Allow fetching from sites with self-signed or incomplete certificates (like the BCV site)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -157,6 +159,67 @@ async function startServer() {
       }
     }
     res.json(results);
+  });
+
+  // Route to send PDF report via email
+  app.post("/api/send-report", async (req, res) => {
+    const { email, pdfBase64, businessName, period } = req.body;
+
+    if (!email || !pdfBase64) {
+      return res.status(400).json({ error: "Email and PDF data are required" });
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || "587"),
+        secure: process.env.SMTP_PORT === "465", // true for 465, false for other ports
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: email,
+        subject: `Balance Operativo - ${businessName} (${period})`,
+        text: `Hola,\n\nAdjuntamos el balance operativo de ${businessName} correspondiente al período: ${period}.\n\nGenerado el: ${new Date().toLocaleString()}\n\nSaludos,\nEquipo Caja Pro`,
+        attachments: [
+          {
+            filename: `Balance_${businessName}_${period}.pdf`,
+            content: pdfBase64.split("base64,")[1] || pdfBase64,
+            encoding: "base64",
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+      res.json({ success: true, message: "Email sent successfully" });
+    } catch (error) {
+      console.error("Error sending email:", error);
+      res.status(500).json({ error: "Failed to send email", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Endpoint para enviar reporte profesional vía JSON
+  app.post("/api/send-balance-pro", async (req, res) => {
+    try {
+      const { balanceData } = req.body;
+      
+      if (!balanceData || !balanceData.email) {
+        return res.status(400).json({ error: "Datos del balance incompletos" });
+      }
+
+      await sendBalanceEmail(balanceData);
+      res.json({ success: true, message: "Reporte enviado profesionalmente" });
+    } catch (error) {
+      console.error("Error en el servidor de correo:", error);
+      res.status(500).json({ 
+        error: "Error interno al enviar el correo",
+        details: error instanceof Error ? error.message : "Error desconocido"
+      });
+    }
   });
 
   // Vite middleware for development

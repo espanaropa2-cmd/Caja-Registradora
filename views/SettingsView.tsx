@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, AppConfig } from '../types';
-import { Save, ExternalLink, Database, CreditCard, Banknote, Hash, Loader2, Send, Sun, Moon } from 'lucide-react';
+import { Save, ExternalLink, Database, CreditCard, Banknote, Hash, Loader2, Send, Sun, Moon, LogOut } from 'lucide-react';
 import { dbService } from '../services/dbService';
 
 interface SettingsViewProps {
   user: UserProfile;
   onUpdateUser: (user: UserProfile) => void;
+  onLogout: () => void;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogout }) => {
   const [formData, setFormData] = useState({
     businessName: user.businessName,
     email: user.email,
@@ -333,8 +334,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
           />
         </div>
 
-        <div className="flex items-center justify-end">
-          <button type="submit" className="bg-slate-900 dark:bg-blue-600 text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-slate-200 dark:shadow-none">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <button 
+            type="button"
+            onClick={onLogout}
+            className="flex items-center gap-3 px-8 py-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-900/20 transition-all border border-rose-100 dark:border-rose-800 shadow-sm"
+          >
+            <LogOut size={18} /> Cerrar Sesión
+          </button>
+          
+          <button type="submit" className="w-full sm:w-auto bg-slate-900 dark:bg-blue-600 text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-slate-200 dark:shadow-none">
             <Save size={20} /> Guardar Cambios
           </button>
         </div>

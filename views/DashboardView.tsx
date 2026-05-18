@@ -2,8 +2,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend, Sector } from 'recharts';
 import { dbService } from '../services/dbService';
-import { DollarSign, TrendingDown, Package, Users, PieChart as PieIcon, Printer, Loader2, ArrowUpRight, Award, Target, X, ChevronRight, FileText } from 'lucide-react';
+import { DollarSign, TrendingDown, Package, Users, PieChart as PieIcon, Printer, Loader2, ArrowUpRight, Award, Target, X, ChevronRight, FileText, Send } from 'lucide-react';
 import { Sale, Expense, Product, Client } from '../types';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 type DashboardPeriod = 'hoy' | 'semana' | 'mes' | 'año';
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -69,6 +71,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
   const [clients, setClients] = useState<Client[]>([]);
   const [period, setPeriod] = useState<DashboardPeriod>('semana');
   const [loading, setLoading] = useState(true);
+  const [isSendingReport, setIsSendingReport] = useState(false);
   
   const [activeProfitIndex, setActiveProfitIndex] = useState(0);
   const [activeUnitsIndex, setActiveUnitsIndex] = useState(0);
@@ -197,81 +200,62 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
     .map(c => ({ name: c.name, value: c.units })), 
   [categoryStats]);
 
-  const handleExportPDF = () => {
+  const handleSendReport = async () => {
     const profileData = JSON.parse(localStorage.getItem('cajapro_profile') || '{}');
     const businessName = profileData.businessName || 'Mi Negocio';
-    const dateStr = new Date().toLocaleString();
+    const userEmail = profileData.email;
     const clientMap = clients.reduce((acc, c) => { acc[c.id] = c.name; return acc; }, {} as any);
-    
-    const incomeRows = filteredData.fSales.length > 0 ? filteredData.fSales.map(s => `
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${new Date(s.date).toLocaleString()}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${clientMap[s.clientId || ''] || 'Venta Contado'}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; text-align: center;">${s.items.reduce((a, it) => a + it.quantity, 0)} uds</td>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; text-align: right; font-weight: bold; color: #3b82f6;">$${(s.total || 0).toLocaleString()}</td>
-      </tr>
-    `).join('') : '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic;">Sin ingresos en este periodo</td></tr>';
 
-    const expenseRows = filteredData.fExpenses.length > 0 ? filteredData.fExpenses.map(e => `
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${new Date(e.date).toLocaleString()}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${e.description}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; text-align: right; font-weight: bold; color: #ef4444;">$${e.amount.toLocaleString()}</td>
-      </tr>
-    `).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic;">Sin egresos en este periodo</td></tr>';
-
-    // VERIFICACIÓN INTEGRAL: Si estamos dentro del APK de Android, llamamos al canal nativo de golpe
-    if ((window as any).AndroidBlobBridge && typeof (window as any).AndroidBlobBridge.ejecutarImpresionWeb === 'function') {
-      (window as any).AndroidBlobBridge.ejecutarImpresionWeb();
+    if (!userEmail) {
+      alert("No se encontró el correo del usuario.");
       return;
     }
 
-    // Flujo tradicional de respaldo exclusivo para computadoras de escritorio
-    let iframe = document.getElementById('print-iframe') as HTMLIFrameElement | null;
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'print-iframe';
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
+    setIsSendingReport(true);
+
+    try {
+      // Estructuramos los datos para la plantilla profesional del servidor
+      const balanceData = {
+        businessName,
+        email: userEmail,
+        period,
+        stats: {
+          revenue: stats.revenue,
+          totalExpenses: stats.totalExpenses,
+          profit: stats.profit,
+          pending: stats.pending
+        },
+        incomeRows: filteredData.fSales.map(s => ({
+          date: new Date(s.date).toLocaleDateString(),
+          client: clientMap[s.clientId || ''] || 'Venta Contado',
+          total: s.total
+        })),
+        expenseRows: filteredData.fExpenses.map(e => ({
+          date: new Date(e.date).toLocaleDateString(),
+          description: e.description,
+          amount: e.amount
+        }))
+      };
+
+      const response = await fetch('/api/send-balance-pro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ balanceData })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert("¡Reporte enviado! Revisa tu correo con el nuevo diseño profesional.");
+      } else {
+        throw new Error(result.error || "Error al enviar el correo");
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      alert("Error al enviar el reporte: " + err.message);
+    } finally {
+      setIsSendingReport(false);
     }
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
-    doc.open();
-    doc.write(`
-      <html>
-        <head>
-          <title>Balance Operativo - ${businessName}</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; color: #1e293b; background: white; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; }
-            th { text-align: left; background: #f1f5f9; padding: 8px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${businessName}</h1>
-            <p>${period}</p>
-          </div>
-          <table>
-            <thead><tr><th>Fecha</th><th>Cliente</th><th>Uds</th><th>Monto</th></tr></thead>
-            <tbody>${incomeRows}</tbody>
-          </table>
-          <p>Generado el ${dateStr}</p>
-        </body>
-      </html>
-    `);
-    doc.close();
-
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-    }, 300);
   };
   const StatCard = ({ title, value, icon: Icon, iconColor, sub }: any) => (
     <div className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group transition-all hover:border-slate-300 dark:hover:border-slate-700 h-full">
@@ -297,10 +281,12 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
           <button 
-            onClick={handleExportPDF}
-            className="w-full sm:w-auto bg-slate-900 dark:bg-blue-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-sm active:scale-95 border border-slate-800 dark:border-blue-500/30"
+            onClick={handleSendReport}
+            disabled={isSendingReport}
+            className="w-full sm:w-auto bg-slate-900 dark:bg-blue-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-sm active:scale-95 border border-slate-800 dark:border-blue-500/30 disabled:opacity-50"
           >
-            <Printer size={16} /> Exportar Balance PDF
+            {isSendingReport ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />} 
+            {isSendingReport ? 'Enviando...' : 'Enviar Balance por Correo'}
           </button>
           <div className="flex bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm w-full lg:w-auto overflow-hidden">
             {(['hoy', 'semana', 'mes', 'año'] as DashboardPeriod[]).map(p => (
