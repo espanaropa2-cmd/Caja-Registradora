@@ -203,7 +203,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
     const dateStr = new Date().toLocaleString();
     const clientMap = clients.reduce((acc, c) => { acc[c.id] = c.name; return acc; }, {} as any);
     
-    // 1. Mapear las filas
     const incomeRows = filteredData.fSales.length > 0 ? filteredData.fSales.map(s => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${new Date(s.date).toLocaleString()}</td>
@@ -221,85 +220,57 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
       </tr>
     `).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic;">Sin egresos en este periodo</td></tr>';
 
-    // 2. Buscar o inicializar un contenedor iframe invisible dedicado exclusivamente al WebView
+    // VERIFICACIÓN INTEGRAL: Si estamos dentro del APK de Android, llamamos al canal nativo de golpe
+    if ((window as any).AndroidBlobBridge && typeof (window as any).AndroidBlobBridge.ejecutarImpresionWeb === 'function') {
+      (window as any).AndroidBlobBridge.ejecutarImpresionWeb();
+      return;
+    }
+
+    // Flujo tradicional de respaldo exclusivo para computadoras de escritorio
     let iframe = document.getElementById('print-iframe') as HTMLIFrameElement | null;
     if (!iframe) {
       iframe = document.createElement('iframe');
       iframe.id = 'print-iframe';
-      iframe.style.position = 'fixed';
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.top = '0';
-      iframe.style.left = '0';
-      iframe.style.opacity = '0';
-      iframe.style.zIndex = '-9999';
+      iframe.style.position = 'absolute';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = 'none';
       document.body.appendChild(iframe);
     }
 
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
 
-    // 3. Escribir el documento completo asegurando estilos de impresión globales
     doc.open();
     doc.write(`
       <html>
         <head>
           <title>Balance Operativo - ${businessName}</title>
           <style>
-            body { font-family: system-ui, sans-serif; padding: 20px; color: #1e293b; background: white; }
+            body { font-family: sans-serif; padding: 20px; color: #1e293b; background: white; }
             .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th { text-align: left; font-size: 10px; background: #f1f5f9; padding: 8px; border-bottom: 1px solid #e2e8f0; }
-            @media print { body { padding: 0; background: white; color: black; } }
+            table { width: 100%; border-collapse: collapse; }
+            th { text-align: left; background: #f1f5f9; padding: 8px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div>
-              <h1 style="margin: 0; font-size: 22px; text-transform: uppercase;">${businessName}</h1>
-              <p style="margin: 3px 0 0; color: #3b82f6; font-size: 11px; font-weight: bold; text-transform: uppercase;">Analítica de Margen Real</p>
-            </div>
-            <div style="text-align: right;">
-              <h2 style="margin: 0; color: #64748b; font-size: 11px; text-transform: uppercase;">Rango</h2>
-              <p style="margin: 3px 0 0; font-weight: bold; font-size: 14px;">${period.charAt(0).toUpperCase() + period.slice(1)}</p>
-            </div>
+            <h1>${businessName}</h1>
+            <p>${period}</p>
           </div>
-
-          <div style="display: flex; gap: 10px; margin-bottom: 25px;">
-            <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; text-align: center;"><small style="color: #94a3b8;">VENTAS</small><br/><strong>$${stats.revenue.toLocaleString()}</strong></div>
-            <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; text-align: center;"><small style="color: #94a3b8;">GASTOS</small><br/><strong>$${stats.totalExpenses.toLocaleString()}</strong></div>
-            <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; text-align: center;"><small style="color: #94a3b8;">NETO</small><br/><strong>$${stats.profit.toLocaleString()}</strong></div>
-            <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; text-align: center;"><small style="color: #94a3b8;">PENDIENTES</small><br/><strong>$${stats.pending.toLocaleString()}</strong></div>
-          </div>
-
-          <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">Detalle de Ingresos</div>
           <table>
-            <thead><tr><th>Fecha</th><th>Cliente</th><th style="text-align: center;">Uds</th><th style="text-align: right;">Monto</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Cliente</th><th>Uds</th><th>Monto</th></tr></thead>
             <tbody>${incomeRows}</tbody>
           </table>
-
-          <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">Detalle de Egresos</div>
-          <table>
-            <thead><tr><th>Fecha</th><th>Concepto</th><th style="text-align: right;">Monto</th></tr></thead>
-            <tbody>${expenseRows}</tbody>
-          </table>
-
-          <div style="margin-top: 30px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 10px;">REPORTE GENERADO EL ${dateStr}</div>
+          <p>Generado el ${dateStr}</p>
         </body>
       </html>
     `);
     doc.close();
 
-    // 4. Mandamos un puente directo a la consola del WebView heredando la ventana raíz sin romper React
     setTimeout(() => {
-      if (navigator.userAgent.includes("Linux x86_64") && (window as any).AndroidBlobBridge) {
-        // Si detecta que está en el APK, le pasa directamente el HTML del iframe a la consola
-        console.log("Print_Invocado");
-      } else {
-        // En la PC ejecuta su flujo normal
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      }
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
     }, 300);
   };
   const StatCard = ({ title, value, icon: Icon, iconColor, sub }: any) => (
