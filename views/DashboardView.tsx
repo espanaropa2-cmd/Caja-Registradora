@@ -203,15 +203,34 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
     const dateStr = new Date().toLocaleString();
     const clientMap = clients.reduce((acc, c) => { acc[c.id] = c.name; return acc; }, {} as any);
     
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    // 1. Crear o buscar el iframe con tipado seguro para evitar bloqueos de compilación
+    let iframe = document.getElementById('print-iframe') as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'print-iframe';
+      iframe.style.position = 'absolute';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = 'none';
+      iframe.style.top = '-1000px'; // Lo mandamos bien lejos de la vista
+      document.body.appendChild(iframe);
+    }
 
+    // 2. Extraer el canal de documento de forma segura
+    const targetWindow = iframe.contentWindow;
+    const doc = targetWindow?.document;
+    if (!targetWindow || !doc) {
+      alert('Error al inicializar el canal de impresión local.');
+      return;
+    }
+
+    // 3. Mapear las filas de la tabla
     const incomeRows = filteredData.fSales.length > 0 ? filteredData.fSales.map(s => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${new Date(s.date).toLocaleString()}</td>
         <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${clientMap[s.clientId || ''] || 'Venta Contado'}</td>
         <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; text-align: center;">${s.items.reduce((a, it) => a + it.quantity, 0)} uds</td>
-        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; text-align: right; font-weight: bold; color: #3b82f6;">$${s.total.toLocaleString()}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; text-align: right; font-weight: bold; color: #3b82f6;">$${(s.total || 0).toLocaleString()}</td>
       </tr>
     `).join('') : '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic;">Sin ingresos en este periodo</td></tr>';
 
@@ -223,7 +242,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
       </tr>
     `).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic;">Sin egresos en este periodo</td></tr>';
 
-    printWindow.document.write(`
+    // 4. Escribir el contenido estructurado
+    doc.open();
+    doc.write(`
       <html>
         <head>
           <title>Balance Operativo - ${businessName}</title>
@@ -283,13 +304,21 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
           </table>
 
           <div class="footer">REPORTE OFICIAL GENERADO POR CAJA PRO EL ${dateStr}</div>
-          <script>window.onload = () => { setTimeout(() => { window.print(); }, 700); };</script>
         </body>
       </html>
     `);
-    printWindow.document.close();
-  };
+    doc.close();
 
+    // 5. Forzar el foco y lanzar la impresión nativa de forma asíncrona segura
+    setTimeout(() => {
+      try {
+        targetWindow.focus();
+        targetWindow.print();
+      } catch (err) {
+        console.error('Error al invocar impresión:', err);
+      }
+    }, 500);
+  };
   const StatCard = ({ title, value, icon: Icon, iconColor, sub }: any) => (
     <div className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group transition-all hover:border-slate-300 dark:hover:border-slate-700 h-full">
       <div className="relative z-10">
