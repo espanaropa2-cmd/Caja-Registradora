@@ -203,28 +203,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
     const dateStr = new Date().toLocaleString();
     const clientMap = clients.reduce((acc, c) => { acc[c.id] = c.name; return acc; }, {} as any);
     
-    // 1. Crear o buscar el iframe con tipado seguro para evitar bloqueos de compilación
-    let iframe = document.getElementById('print-iframe') as HTMLIFrameElement | null;
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'print-iframe';
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
-      iframe.style.top = '-1000px'; // Lo mandamos bien lejos de la vista
-      document.body.appendChild(iframe);
-    }
-
-    // 2. Extraer el canal de documento de forma segura
-    const targetWindow = iframe.contentWindow;
-    const doc = targetWindow?.document;
-    if (!targetWindow || !doc) {
-      alert('Error al inicializar el canal de impresión local.');
-      return;
-    }
-
-    // 3. Mapear las filas de la tabla
+    // 1. Mapear las filas de datos
     const incomeRows = filteredData.fSales.length > 0 ? filteredData.fSales.map(s => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">${new Date(s.date).toLocaleString()}</td>
@@ -242,82 +221,58 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
       </tr>
     `).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic;">Sin egresos en este periodo</td></tr>';
 
-    // 4. Escribir el contenido estructurado
-    doc.open();
-    doc.write(`
-      <html>
-        <head>
-          <title>Balance Operativo - ${businessName}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-            body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; background: white; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 5px solid #3b82f6; padding-bottom: 25px; margin-bottom: 30px; }
-            .business-info h1 { margin: 0; font-size: 32px; font-weight: 900; text-transform: uppercase; color: #1e293b; letter-spacing: -1px; }
-            .business-info p { margin: 5px 0 0; color: #3b82f6; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }
-            .report-meta { text-align: right; }
-            .report-meta h2 { margin: 0; color: #64748b; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-            .report-meta p { margin: 5px 0 0; font-weight: 900; font-size: 18px; color: #1e293b; }
-            
-            .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
-            .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 20px; text-align: center; }
-            .summary-card label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 4px; }
-            .summary-card span { font-size: 20px; font-weight: 900; }
-
-            .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; color: #1e293b; margin: 40px 0 15px; display: flex; align-items: center; border-left: 5px solid #3b82f6; padding-left: 12px; }
-            
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th { text-align: left; font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; padding: 12px 10px; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
-            
-            .footer { margin-top: 60px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 700; border-top: 1px solid #f1f5f9; padding-top: 30px; letter-spacing: 0.5px; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="business-info">
-              <h1>${businessName}</h1>
-              <p>Analítica de Margen Real</p>
-            </div>
-            <div class="report-meta">
-              <h2>Rango de Tiempo</h2>
-              <p>${period.charAt(0).toUpperCase() + period.slice(1)}</p>
-            </div>
+    // 2. Estructurar el HTML del reporte
+    const htmlPrint = `
+      <div id="print-content-section" style="font-family: sans-serif; padding: 20px; color: #1e293b; background: white;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 5px solid #3b82f6; padding-bottom: 15px; margin-bottom: 20px;">
+          <div>
+            <h1 style="margin: 0; font-size: 26px; font-weight: 900; text-transform: uppercase;">${businessName}</h1>
+            <p style="margin: 5px 0 0; color: #3b82f6; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Analítica de Margen Real</p>
           </div>
-
-          <div class="summary-grid">
-            <div class="summary-card"><label>Ventas Brutas</label><span style="color: #3b82f6;">$${stats.revenue.toLocaleString()}</span></div>
-            <div class="summary-card"><label>Gastos Globales</label><span style="color: #ef4444;">$${stats.totalExpenses.toLocaleString()}</span></div>
-            <div class="summary-card"><label>Ganancia Neta</label><span style="color: #10b981;">$${stats.profit.toLocaleString()}</span></div>
-            <div class="summary-card"><label>CxC Pendientes</label><span style="color: #f59e0b;">$${stats.pending.toLocaleString()}</span></div>
+          <div style="text-align: right;">
+            <h2 style="margin: 0; color: #64748b; font-size: 12px; text-transform: uppercase;">Rango de Tiempo</h2>
+            <p style="margin: 5px 0 0; font-weight: bold; font-size: 16px;">${period.charAt(0).toUpperCase() + period.slice(1)}</p>
           </div>
+        </div>
 
-          <div class="section-title">Detalle Exhaustivo de Ingresos</div>
-          <table>
-            <thead><tr><th>Fecha / Hora</th><th>Cliente</th><th style="text-align: center;">Volumen</th><th style="text-align: right;">Monto Total</th></tr></thead>
-            <tbody>${incomeRows}</tbody>
-          </table>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 30px;">
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center;"><label style="font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">Ventas</label><br/><span style="font-size: 16px; font-weight: bold; color: #3b82f6;">$${stats.revenue.toLocaleString()}</span></div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center;"><label style="font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">Gastos</label><br/><span style="font-size: 16px; font-weight: bold; color: #ef4444;">$${stats.totalExpenses.toLocaleString()}</span></div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center;"><label style="font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">Neto</label><br/><span style="font-size: 16px; font-weight: bold; color: #10b981;">$${stats.profit.toLocaleString()}</span></div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center;"><label style="font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">Pendientes</label><br/><span style="font-size: 16px; font-weight: bold; color: #f59e0b;">$${stats.pending.toLocaleString()}</span></div>
+        </div>
 
-          <div class="section-title">Detalle de Egresos</div>
-          <table>
-            <thead><tr><th>Fecha / Hora</th><th>Concepto</th><th style="text-align: right;">Monto</th></tr></thead>
-            <tbody>${expenseRows}</tbody>
-          </table>
+        <div style="font-size: 12px; font-weight: bold; text-transform: uppercase; margin: 20px 0 10px; border-left: 4px solid #3b82f6; padding-left: 8px;">Detalle de Ingresos</div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <thead><tr><th style="text-align: left; font-size: 9px; background: #f1f5f9; padding: 8px;">Fecha</th><th style="text-align: left; font-size: 9px; background: #f1f5f9; padding: 8px;">Cliente</th><th style="text-align: center; font-size: 9px; background: #f1f5f9; padding: 8px;">Volumen</th><th style="text-align: right; font-size: 9px; background: #f1f5f9; padding: 8px;">Monto</th></tr></thead>
+          <tbody>${incomeRows}</tbody>
+        </table>
 
-          <div class="footer">REPORTE OFICIAL GENERADO POR CAJA PRO EL ${dateStr}</div>
-        </body>
-      </html>
-    `);
-    doc.close();
+        <div style="font-size: 12px; font-weight: bold; text-transform: uppercase; margin: 20px 0 10px; border-left: 4px solid #3b82f6; padding-left: 8px;">Detalle de Egresos</div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <thead><tr><th style="text-align: left; font-size: 9px; background: #f1f5f9; padding: 8px;">Fecha</th><th style="text-align: left; font-size: 9px; background: #f1f5f9; padding: 8px;">Concepto</th><th style="text-align: right; font-size: 9px; background: #f1f5f9; padding: 8px;">Monto</th></tr></thead>
+          <tbody>${expenseRows}</tbody>
+        </table>
 
-    // 5. Forzar el foco y lanzar la impresión nativa de forma asíncrona segura
+        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 15px;">REPORTE GENERADO EL ${dateStr}</div>
+      </div>
+    `;
+
+    // TRUCO SUPREMO DE INTERCEPTACIÓN GLOBAL:
+    // Guardamos el body original de la app de React
+    const originalBody = document.body.innerHTML;
+
+    // Reemplazamos la pantalla completa con el HTML limpio del balance
+    document.body.innerHTML = htmlPrint;
+
+    // Forzamos la orden de impresión nativa desde la ventana principal (Hará reaccionar a Android de golpe)
     setTimeout(() => {
-      try {
-        targetWindow.focus();
-        targetWindow.print();
-      } catch (err) {
-        console.error('Error al invocar impresión:', err);
-      }
-    }, 500);
+      window.print();
+      
+      // Una vez que se abre el menú, restauramos la interfaz completa de React como si nada hubiera pasado
+      // Recargamos la ubicación para devolverle los eventos vivos al DOM de Vite/React sin alterar la sesión
+      window.location.reload();
+    }, 250);
   };
   const StatCard = ({ title, value, icon: Icon, iconColor, sub }: any) => (
     <div className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group transition-all hover:border-slate-300 dark:hover:border-slate-700 h-full">
