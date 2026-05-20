@@ -223,13 +223,6 @@ export const printThermalReceipt = (
             <span>Bs. ${totalVES.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
 
-          <div style="font-size: 10px; margin-top: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
-            <div class="info-row">
-              <span>Tasa de Cambio Referencial:</span>
-              <span>1 USD = ${conversionRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BS</span>
-            </div>
-          </div>
-
           <div class="info-row" style="margin-top: 4px;">
             <span class="info-label">MÉT. PAGO:</span>
             <span style="font-weight: bold;">${paymentMethodStr} ${paymentRefStr}</span>
