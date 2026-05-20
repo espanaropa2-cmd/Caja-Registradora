@@ -36,31 +36,24 @@ export const printThermalReceipt = (
   const paymentMethodStr = primaryPayment ? primaryPayment.method : (sale.payments && sale.payments[1]?.method || 'EFECTIVO');
   const paymentRefStr = primaryPayment?.reference ? `#${primaryPayment.reference}` : '';
 
+  // Determine currency based on payment method
+  const isBsOnly = paymentMethodStr === PaymentMethod.PUNTO || paymentMethodStr === PaymentMethod.PAGOMOVIL;
+
   // Calculate items details HTML literal
   const itemsHTML = sale.items.map(item => {
-    const itemSubtotal = item.price * item.quantity;
+    const priceToShow = isBsOnly ? item.price * conversionRate : item.price;
+    const subtotalToShow = isBsOnly ? (item.price * item.quantity) * conversionRate : item.price * item.quantity;
+    const currencySign = isBsOnly ? 'Bs. ' : '$';
     return `
       <div style="margin-bottom: 8px;">
         <div style="font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.name}</div>
         <div style="display: flex; justify-content: space-between; font-size: 11px; color: #444; margin-top: 2px;">
-          <span>${item.quantity} x $${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          <span style="font-weight: bold; color: #000;">$${itemSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span>${item.quantity} x ${currencySign}${priceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style="font-weight: bold; color: #000;">${currencySign}${subtotalToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
       </div>
     `;
   }).join('');
-
-  // Dual/Mix rate totals if triple price is active
-  let triplePriceSection = '';
-  if (rates.showTriplePrice && rates.officialRate && rates.parallelRate) {
-    const mixTotalUSD = (sale.total * rates.parallelRate) / rates.officialRate;
-    triplePriceSection = `
-      <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
-        <span>MIX (Tasa Paralelo/Oficial):</span>
-        <span style="font-weight: bold;">$${mixTotalUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-      </div>
-    `;
-  }
 
   // Create document body for the printable iframe
   const receiptHTML = `
@@ -219,45 +212,68 @@ export const printThermalReceipt = (
       <div class="double-divider"></div>
 
       <div class="totals-section">
-        <div class="total-row">
-          <span>SUBTOTAL USD:</span>
-          <span>$${sale.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        </div>
-        
-        ${triplePriceSection}
-
-        <div class="grand-total total-row">
-          <span>TOTAL USD:</span>
-          <span>$${sale.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        </div>
-
-        <div style="font-size: 10px; margin-top: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
-          <div class="info-row">
-            <span>Tasa de Cambio:</span>
-            <span>1 USD = ${conversionRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BS</span>
+        ${isBsOnly ? `
+          <div class="total-row">
+            <span>SUBTOTAL BS:</span>
+            <span>Bs. ${totalVES.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-          <div class="info-row" style="font-size: 12px; font-weight: bold; color: #000; margin-top: 2px;">
+          
+          <div class="grand-total total-row">
             <span>TOTAL BS:</span>
             <span>Bs. ${totalVES.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-        </div>
 
-        <div class="info-row" style="margin-top: 4px;">
-          <span class="info-label">MÉT. PAGO:</span>
-          <span style="font-weight: bold;">${paymentMethodStr} ${paymentRefStr}</span>
-        </div>
-        
-        <div class="info-row">
-          <span class="info-label">MONTO PAGADO:</span>
-          <span>$${sale.amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        </div>
-
-        ${sale.status === 'CREDIT' ? `
-          <div class="info-row" style="color: #ff0000; font-weight: bold;">
-            <span class="info-label">SALDO DEUDOR:</span>
-            <span>$${(sale.total - sale.amountPaid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div style="font-size: 10px; margin-top: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
+            <div class="info-row">
+              <span>Tasa de Cambio Referencial:</span>
+              <span>1 USD = ${conversionRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BS</span>
+            </div>
           </div>
-        ` : ''}
+
+          <div class="info-row" style="margin-top: 4px;">
+            <span class="info-label">MÉT. PAGO:</span>
+            <span style="font-weight: bold;">${paymentMethodStr} ${paymentRefStr}</span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">MONTO PAGADO BS:</span>
+            <span>Bs. ${(sale.amountPaid * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+
+          ${sale.status === 'CREDIT' ? `
+            <div class="info-row" style="color: #ff0000; font-weight: bold;">
+              <span class="info-label">SALDO DEUDOR BS:</span>
+              <span>Bs. ${((sale.total - sale.amountPaid) * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          ` : ''}
+        ` : `
+          <div class="total-row">
+            <span>SUBTOTAL USD:</span>
+            <span>$${sale.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+
+          <div class="grand-total total-row">
+            <span>TOTAL USD:</span>
+            <span>$${sale.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+
+          <div class="info-row" style="margin-top: 4px;">
+            <span class="info-label">MÉT. PAGO:</span>
+            <span style="font-weight: bold;">${paymentMethodStr} ${paymentRefStr}</span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">MONTO PAGADO:</span>
+            <span>$${sale.amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+
+          ${sale.status === 'CREDIT' ? `
+            <div class="info-row" style="color: #ff0000; font-weight: bold;">
+              <span class="info-label">SALDO DEUDOR:</span>
+              <span>$${(sale.total - sale.amountPaid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          ` : ''}
+        `}
       </div>
 
       <div class="footer">
