@@ -3,7 +3,7 @@ import path from "path";
 import cors from "cors";
 import axios from "axios";
 import nodemailer from "nodemailer";
-import { sendBalanceEmail } from "./services/emailService.ts";
+import { sendBalanceEmail, getSMTPConfig } from "./services/emailService.ts";
 
 // Allow fetching from sites with self-signed or incomplete certificates (like the BCV site)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -161,6 +161,21 @@ async function startServer() {
     res.json(results);
   });
 
+function getFriendlySMTPErrMsg(error: any): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes('ENOTFOUND') || msg.includes('getaddrinfo')) {
+    const hostVal = process.env.SMTP_HOST || '';
+    return `Error de conexión: El Host SMTP no pudo ser resuelto. Verifica el valor de 'SMTP_HOST' en los Ajustes de la plataforma (por ejemplo, debe ser 'smtp.gmail.com' en lugar de una dirección de correo como '${hostVal}').`;
+  }
+  if (msg.includes('ECONNREFUSED') || msg.includes('timeout')) {
+    return `Error de red: No se pudo conectar al servidor SMTP en el puerto ${process.env.SMTP_PORT || '587'}. Verifica si el puerto es el correcto.`;
+  }
+  if (msg.includes('Invalid login') || msg.includes('Authentication failed') || msg.includes('535')) {
+    return "Error de credenciales: Nombre de usuario o contraseña incorrectos. Si usas Gmail u Outlook, recuerda que debes generar una 'Contraseña de Aplicación' (App Password) en la configuración de tu cuenta en lugar de ingresar tu contraseña personal habitual.";
+  }
+  return msg;
+}
+
   // Route to send PDF report via email
   app.post("/api/send-report", async (req, res) => {
     const { email, pdfBase64, businessName, period } = req.body;
@@ -170,18 +185,20 @@ async function startServer() {
     }
 
     try {
+      const { host, port, user, pass, from } = getSMTPConfig();
+      
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || "587"),
-        secure: process.env.SMTP_PORT === "465", // true for 465, false for other ports
+        host,
+        port,
+        secure: port === 465,
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user,
+          pass,
         },
       });
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        from: from || user,
         to: email,
         subject: `Balance Operativo - ${businessName} (${period})`,
         text: `Hola,\n\nAdjuntamos el balance operativo de ${businessName} correspondiente al período: ${period}.\n\nGenerado el: ${new Date().toLocaleString()}\n\nSaludos,\nEquipo Caja Pro`,
@@ -198,7 +215,8 @@ async function startServer() {
       res.json({ success: true, message: "Email sent successfully" });
     } catch (error) {
       console.error("Error sending email:", error);
-      res.status(500).json({ error: "Failed to send email", details: error instanceof Error ? error.message : String(error) });
+      const friendlyDetails = getFriendlySMTPErrMsg(error);
+      res.status(500).json({ error: "Failed to send email", details: friendlyDetails });
     }
   });
 
@@ -215,9 +233,10 @@ async function startServer() {
       res.json({ success: true, message: "Reporte enviado profesionalmente" });
     } catch (error) {
       console.error("Error en el servidor de correo:", error);
+      const friendlyDetails = getFriendlySMTPErrMsg(error);
       res.status(500).json({ 
-        error: "Error interno al enviar el correo",
-        details: error instanceof Error ? error.message : "Error desconocido"
+        error: friendlyDetails,
+        details: friendlyDetails
       });
     }
   });

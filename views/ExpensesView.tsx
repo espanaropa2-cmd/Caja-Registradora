@@ -1,11 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
-import { Expense, ExpenseCategory } from '../types';
-import { TrendingDown, Plus, DollarSign, Tag, Edit2, Trash2, Loader2, X, AlertTriangle, Layers, FileUp, FileText } from 'lucide-react';
+import { Expense, ExpenseCategory, UserProfile } from '../types';
+import { TrendingDown, Plus, DollarSign, Tag, Edit2, Trash2, Loader2, X, AlertTriangle, Layers, FileUp, FileText, Banknote, Save } from 'lucide-react';
 import Papa from 'papaparse';
 
-const ExpensesView: React.FC = () => {
+interface ExpensesViewProps {
+  user: UserProfile;
+  onUpdateUser: (user: UserProfile) => Promise<void>;
+}
+
+const ExpensesView: React.FC<ExpensesViewProps> = ({ user, onUpdateUser }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -14,6 +19,44 @@ const ExpensesView: React.FC = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [savingCosts, setSavingCosts] = useState(false);
+
+  const [formData, setFormData] = useState({
+    monthlyOperatingExpenses: user.monthlyOperatingExpenses || 0,
+    monthlySalaries: user.monthlySalaries || 0,
+    initialInvestmentAmount: user.initialInvestmentAmount || 0,
+    initialInvestmentLifeMonths: user.initialInvestmentLifeMonths || 0
+  });
+
+  useEffect(() => {
+    setFormData({
+      monthlyOperatingExpenses: user.monthlyOperatingExpenses || 0,
+      monthlySalaries: user.monthlySalaries || 0,
+      initialInvestmentAmount: user.initialInvestmentAmount || 0,
+      initialInvestmentLifeMonths: user.initialInvestmentLifeMonths || 0
+    });
+  }, [user]);
+
+  const handleSaveFixedCosts = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (savingCosts) return;
+    setSavingCosts(true);
+    try {
+      await onUpdateUser({
+        ...user,
+         monthlyOperatingExpenses: formData.monthlyOperatingExpenses,
+         monthlySalaries: formData.monthlySalaries,
+         initialInvestmentAmount: formData.initialInvestmentAmount,
+         initialInvestmentLifeMonths: formData.initialInvestmentLifeMonths
+      });
+      alert('¡Éxito! Estructura de costos fijos e inversión guardada.');
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al guardar costos fijos: ' + (err.message || String(err)));
+    } finally {
+      setSavingCosts(false);
+    }
+  };
 
   const downloadExpensesTemplate = () => {
     const csvContent = "Descripcion,Monto,Categoria,Fecha\nPago de Alquiler,500.00,Otros,2024-05-15\nCompra de Mercancia,1200.50,Reabastecimiento,2024-05-14";
@@ -237,6 +280,100 @@ const ExpensesView: React.FC = () => {
               Recuerda: Los gastos operativos de tu negocio afectan tu utilidad neta en el Dashboard.
             </p>
           </div>
+
+          {/* Costos Fijos e Inversión */}
+          <form onSubmit={handleSaveFixedCosts} className="bg-white dark:bg-slate-900 p-6 lg:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-colors space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-rose-600 rounded-xl text-white shadow-lg shadow-rose-500/20">
+                <Banknote size={20} />
+              </div>
+              <div>
+                <h3 className="text-md font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">Costos Fijos</h3>
+                <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mt-0.5">Estructura e Inversión</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium px-1">
+              Configura tus egresos recurrentes y la inversión inicial para prorratear los egresos en tus balances.
+            </p>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Gastos Operativos (USD/Mes)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  placeholder="Ej: Alquiler, servicios, etc."
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-bold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/10 transition-all text-xs"
+                  value={formData.monthlyOperatingExpenses || ''}
+                  onChange={e => setFormData({...formData, monthlyOperatingExpenses: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Nóminas y Salarios (USD/Mes)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  placeholder="Ej: Nómina de empleados"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-bold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/10 transition-all text-xs"
+                  value={formData.monthlySalaries || ''}
+                  onChange={e => setFormData({...formData, monthlySalaries: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Inversión (USD)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    placeholder="Monto total"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-bold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/10 transition-all text-xs"
+                    value={formData.initialInvestmentAmount || ''}
+                    onChange={e => setFormData({...formData, initialInvestmentAmount: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Vida Útil (Meses)</label>
+                  <input 
+                    type="number" 
+                    placeholder="Ej: 36, 48"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-bold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/10 transition-all text-xs"
+                    value={formData.initialInvestmentLifeMonths || ''}
+                    onChange={e => setFormData({...formData, initialInvestmentLifeMonths: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Resumen prorrateo rápido */}
+            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-[1.5rem] p-4 border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-1.5">
+                <div className="w-1 h-1 bg-rose-500 rounded-full"></div> Prorrateo Estimado
+              </h4>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Fijos/Mes</span>
+                  <span className="text-sm font-black text-slate-800 dark:text-slate-100 font-mono">
+                    ${((formData.monthlyOperatingExpenses || 0) + (formData.monthlySalaries || 0) + (formData.initialInvestmentLifeMonths > 0 ? (formData.initialInvestmentAmount / formData.initialInvestmentLifeMonths) : 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Deducción Diaria</span>
+                  <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    ${(((formData.monthlyOperatingExpenses || 0) + (formData.monthlySalaries || 0) + (formData.initialInvestmentLifeMonths > 0 ? (formData.initialInvestmentAmount / formData.initialInvestmentLifeMonths) : 0)) / 30).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" disabled={savingCosts} className="w-full bg-slate-900 dark:bg-rose-600 hover:bg-slate-800 dark:hover:bg-rose-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg">
+              {savingCosts ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+              Guardar Estructura
+            </button>
+          </form>
         </div>
       </div>
 

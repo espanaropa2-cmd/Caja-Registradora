@@ -689,4 +689,28 @@ export const dbService = {
     const { error: updateReqErr } = await supabase.from('subscription_requests').update({ status }).eq('id', requestId);
     if (updateReqErr) throw updateReqErr;
   },
+
+  // Cortes Mensuales
+  async checkMonthlyClosureSent(yearMonth: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('id')
+      .filter('description', 'eq', `⚙️ [CORTE_ENVIADO] ${yearMonth}`)
+      .limit(1);
+    
+    return !error && data && data.length > 0;
+  },
+
+  async markMonthlyClosureSent(yearMonth: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    await supabase.from('expenses').insert({
+      id: generateUUID(),
+      description: `⚙️ [CORTE_ENVIADO] ${yearMonth}`,
+      amount: 0,
+      date: new Date().toISOString(),
+      user_id: user.id
+    });
+  }
 };

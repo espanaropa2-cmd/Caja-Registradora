@@ -32,6 +32,10 @@ export interface UserProfile {
   useParallelRate?: boolean;
   showTriplePrice?: boolean;
   isDarkMode?: boolean;
+  monthlyOperatingExpenses?: number;
+  monthlySalaries?: number;
+  initialInvestmentAmount?: number;
+  initialInvestmentLifeMonths?: number;
 }
 
 export interface AppConfig {

@@ -10,6 +10,7 @@ interface BalanceData {
     totalExpenses: number;
     profit: number;
     pending: number;
+    realCash?: number;
   };
   incomeRows: any[];
   expenseRows: any[];
@@ -33,11 +34,11 @@ export const generateBalanceHTML = (data: BalanceData) => {
         
         .content { padding: 40px; }
         
-        .grid { display: table; width: 100%; border-spacing: 10px; margin-bottom: 30px; }
-        .grid-item { display: table-cell; background: #f1f5f9; padding: 15px; border-radius: 12px; text-align: center; width: 25%; }
-        .grid-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
-        .grid-value { font-size: 16px; font-weight: 900; }
-
+        .grid { display: table; width: 100%; border-spacing: 8px; margin-bottom: 30px; table-layout: fixed; }
+        .grid-item { display: table-cell; background: #f1f5f9; padding: 12px 6px; border-radius: 12px; text-align: center; }
+        .grid-label { font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; }
+        .grid-value { font-size: 14px; font-weight: 900; }
+ 
         .section-title { font-size: 12px; font-weight: 900; text-transform: uppercase; color: #0f172a; border-left: 4px solid #3b82f6; padding-left: 10px; margin: 30px 0 15px; }
         
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
@@ -67,12 +68,16 @@ export const generateBalanceHTML = (data: BalanceData) => {
               <div class="grid-label">Egresos</div>
               <div class="grid-value" style="color: #dc2626;">$${stats.totalExpenses.toLocaleString()}</div>
             </div>
+            <div class="grid-item" style="background: #ecfdf5; border: 1px solid #a7f3d0;">
+              <div class="grid-label" style="color: #065f46;">Efec. Caja</div>
+              <div class="grid-value" style="color: #047857;">$${(stats.realCash !== undefined ? stats.realCash : stats.profit).toLocaleString()}</div>
+            </div>
             <div class="grid-item">
               <div class="grid-label">Utilidad</div>
               <div class="grid-value" style="color: #059669;">$${stats.profit.toLocaleString()}</div>
             </div>
             <div class="grid-item">
-              <div class="grid-label">Créditos</div>
+              <div class="grid-label">Por Cobrar</div>
               <div class="grid-value" style="color: #d97706;">$${stats.pending.toLocaleString()}</div>
             </div>
           </div>
@@ -128,21 +133,87 @@ export const generateBalanceHTML = (data: BalanceData) => {
   `;
 };
 
+export function getSMTPConfig() {
+  const cleanEnv = (val: string | undefined): string => {
+    if (!val) return '';
+    let s = val.trim();
+    if (s.startsWith('"') && s.endsWith('"')) {
+      s = s.slice(1, -1).trim();
+    }
+    if (s.startsWith("'") && s.endsWith("'")) {
+      s = s.slice(1, -1).trim();
+    }
+    return s;
+  };
+
+  let host = cleanEnv(process.env.SMTP_HOST);
+  let portStr = cleanEnv(process.env.SMTP_PORT);
+  let port = parseInt(portStr || '587');
+  let user = cleanEnv(process.env.SMTP_USER);
+  let pass = cleanEnv(process.env.SMTP_PASS);
+  let from = cleanEnv(process.env.SMTP_FROM || user);
+
+  // Sanitize host if the user entered an email address as the host by mistake
+  if (host.includes('@')) {
+    const domain = host.split('@')[1];
+    if (domain === 'gmail.com') {
+      host = 'smtp.gmail.com';
+    } else if (domain === 'hotmail.com' || domain === 'live.com') {
+      host = 'smtp.office365.com';
+    } else if (domain === 'outlook.com') {
+      host = 'smtp-mail.outlook.com';
+    } else if (domain === 'yahoo.com') {
+      host = 'smtp.mail.yahoo.com';
+    } else {
+      host = `smtp.${domain}`;
+    }
+  }
+
+  // Also verify user: if SMTP_HOST is totally empty but SMTP_USER is set to an email, fallback gracefully
+  if (!host && user.includes('@')) {
+    const domain = user.split('@')[1];
+    if (domain === 'gmail.com') {
+      host = 'smtp.gmail.com';
+    } else if (domain === 'hotmail.com' || domain === 'live.com') {
+      host = 'smtp.office365.com';
+    } else if (domain === 'outlook.com') {
+      host = 'smtp-mail.outlook.com';
+    } else if (domain === 'yahoo.com') {
+      host = 'smtp.mail.yahoo.com';
+    } else {
+      host = `smtp.${domain}`;
+    }
+  }
+
+  // Default fallback if still empty
+  if (!host) {
+    host = 'smtp.gmail.com';
+  }
+
+  if (!port || isNaN(port)) {
+    port = host === 'smtp.gmail.com' ? 587 : 587;
+  }
+
+  return { host, port, user, pass, from };
+}
+
 export const sendBalanceEmail = async (data: BalanceData) => {
+  const { host, port, user, pass, from } = getSMTPConfig();
+  
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465',
+    host,
+    port,
+    secure: port === 465,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user,
+      pass,
     },
   });
 
   const html = generateBalanceHTML(data);
 
   return transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: from || user,
     to: data.email,
     subject: `Balance Operativo: ${data.businessName} - p. ${data.period}`,
     html: html,

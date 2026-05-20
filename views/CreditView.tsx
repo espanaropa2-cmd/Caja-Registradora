@@ -136,9 +136,12 @@ const CreditView: React.FC<CreditViewProps> = ({ useParallelRate = false }) => {
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">{client.phone || 'Sin contacto'}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end">
                   <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter">Deuda Total</p>
                   <span className="font-black text-rose-600 dark:text-rose-400 text-lg tracking-tight">${client.currentDebt.toLocaleString()}</span>
+                  <span className="mt-1 text-[8px] font-black bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 px-2 py-0.5 rounded-full uppercase tracking-widest leading-none">
+                    Pendiente
+                  </span>
                 </div>
               </div>
             ))}

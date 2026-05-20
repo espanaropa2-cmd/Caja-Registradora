@@ -78,7 +78,11 @@ const App: React.FC = () => {
           lastPaymentRef: data.last_payment_ref,
           useParallelRate: data.use_parallel_rate || false,
           showTriplePrice: data.show_triple_price || false,
-          isDarkMode: data.is_dark_mode || false
+          isDarkMode: data.is_dark_mode || false,
+          monthlyOperatingExpenses: data.monthly_operating_expenses || 0,
+          monthlySalaries: data.monthly_salaries || 0,
+          initialInvestmentAmount: data.initial_investment_amount || 0,
+          initialInvestmentLifeMonths: data.initial_investment_life_months || 0
         };
         setProfile(newProfile);
         localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
@@ -154,6 +158,8 @@ const App: React.FC = () => {
       document.body.style.backgroundColor = '#f8fafc';
     }
   }, [profile?.isDarkMode]);
+
+
 
   const handleSyncSheets = async () => {
     if (!profile?.sheetsUrl) {
@@ -286,7 +292,22 @@ const App: React.FC = () => {
       case 'sales_history': return <SalesHistoryView />;
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;
-      case 'expenses': return <ExpensesView />;
+      case 'expenses': return <ExpensesView user={profile} onUpdateUser={async (p) => {
+        setProfile(p);
+        localStorage.setItem('cajapro_profile', JSON.stringify(p));
+        // Persistir en Supabase
+        await supabase.from('profiles').update({
+          business_name: p.businessName,
+          email: p.email,
+          sheets_url: p.sheetsUrl,
+          use_parallel_rate: p.useParallelRate,
+          is_dark_mode: p.isDarkMode,
+          monthly_operating_expenses: p.monthlyOperatingExpenses || 0,
+          monthly_salaries: p.monthlySalaries || 0,
+          initial_investment_amount: p.initialInvestmentAmount || 0,
+          initial_investment_life_months: p.initialInvestmentLifeMonths || 0
+        }).eq('id', p.id);
+      }} />;
       case 'admin': return isAdmin ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'settings': return <SettingsView user={profile} onLogout={handleLogout} onUpdateUser={async (p) => {
         setProfile(p);
@@ -297,7 +318,11 @@ const App: React.FC = () => {
           email: p.email,
           sheets_url: p.sheetsUrl,
           use_parallel_rate: p.useParallelRate,
-          is_dark_mode: p.isDarkMode
+          is_dark_mode: p.isDarkMode,
+          monthly_operating_expenses: p.monthlyOperatingExpenses || 0,
+          monthly_salaries: p.monthlySalaries || 0,
+          initial_investment_amount: p.initialInvestmentAmount || 0,
+          initial_investment_life_months: p.initialInvestmentLifeMonths || 0
         }).eq('id', p.id);
       }} />;
       default: return <DashboardView />;

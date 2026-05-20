@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, AppConfig } from '../types';
-import { Save, ExternalLink, Database, CreditCard, Banknote, Hash, Loader2, Send, Sun, Moon, LogOut } from 'lucide-react';
+import { Save, ExternalLink, Database, CreditCard, Hash, Loader2, Send, Sun, Moon, LogOut } from 'lucide-react';
 import { dbService } from '../services/dbService';
 
 interface SettingsViewProps {
