@@ -674,25 +674,25 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
       {/* Modal Reponer Stock con Calculadora Similar */}
       {isReplenishOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsReplenishOpen(false)} />
-          <form onSubmit={handleReplenish} className="relative bg-white w-full max-md rounded-[3rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+          <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-md" onClick={() => setIsReplenishOpen(false)} />
+          <form onSubmit={handleReplenish} className="relative bg-white dark:bg-[#0f172a] w-full max-w-md rounded-[3rem] p-8 shadow-2xl space-y-6 border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Entrada de Mercancía</h3>
+              <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Entrada de Mercancía</h3>
               <Calculator size={20} className="text-blue-500" />
             </div>
             <div className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cantidad a Añadir</label>
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block ml-1">Cantidad a Añadir</label>
                 <input 
                   type="number" 
                   required 
                   value={replenishQty || ''} 
                   onChange={(e) => updateReplenishByQty(Number(e.target.value))} 
-                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-black text-xl" 
+                  className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 outline-none font-black text-xl text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 transition-all rounded-2xl" 
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Costo Unitario de Compra ($)</label>
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block ml-1">Costo Unitario de Compra ($)</label>
                 <div className="flex flex-col">
                   <div className="relative flex-1">
                     <input 
@@ -701,29 +701,29 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                       required 
                       value={replenishUnitCost || ''} 
                       onChange={(e) => updateReplenishByUnitCost(Number(e.target.value))} 
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-black text-xl" 
+                      className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 outline-none font-black text-xl text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 transition-all rounded-2xl" 
                     />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300">$</div>
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-300 dark:text-slate-600">$</div>
                   </div>
                   {rate > 0 && replenishUnitCost > 0 && (
-                    <div className="ml-1 mt-1 flex items-center gap-1.5">
+                    <div className="ml-1 mt-1.5 flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">Equivale a: <span className="text-blue-600">Bs. {(replenishUnitCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+                      <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Equivale a: <span className="text-blue-600 dark:text-blue-400">Bs. {(replenishUnitCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
                     </div>
                   )}
                 </div>
-                {rate > 0 && <div className="flex justify-between items-center mt-1">
+                {rate > 0 && <div className="flex justify-between items-center mt-1.5 px-1">
                   <button 
                     type="button" 
                     onClick={getRate}
-                    className="text-[8px] font-black text-blue-400 uppercase tracking-tighter hover:text-blue-600 flex items-center gap-1 transition-colors"
+                    className="text-[8px] font-black text-blue-400 uppercase tracking-tighter hover:text-blue-600 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
                   >
                     <RefreshCw size={10} className={isRateLoading ? 'animate-spin' : ''} /> Actualizar Tasa
                   </button>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">{useParallelRate ? 'Tasa Paralelo' : 'Tasa BCV'}: {rate.toLocaleString()} Bs/$</p>
+                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">{useParallelRate ? 'Tasa Paralelo' : 'Tasa BCV'}: {rate.toLocaleString()} Bs/$</p>
                 </div>}
               </div>
-              <div className="bg-slate-900 rounded-2xl p-5 text-white">
+              <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl p-5 text-white border border-transparent dark:border-slate-800">
                  <div className="flex justify-between items-center mb-1">
                    <p className="text-[8px] font-black uppercase opacity-50 tracking-widest">Monto de Inversión (Total)</p>
                    <button 
@@ -759,7 +759,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                         updateReplenishByTotalCost(numVal);
                       }
                     }} 
-                    className="bg-transparent border-none outline-none text-3xl font-black text-emerald-400 w-full placeholder:text-emerald-900/30" 
+                    className="bg-transparent border-none outline-none text-3xl font-black text-emerald-400 w-full placeholder:text-emerald-950/30" 
                     placeholder="0.00"
                   />
                   <span className={`text-xl font-black absolute right-0 pointer-events-none transition-all duration-300 ${replenishTotalCostMode === 'USD' ? 'text-blue-500/20' : 'text-emerald-500/20'}`}>
@@ -768,7 +768,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                  </div>
               </div>
             </div>
-            <button disabled={loading || replenishQty <= 0} type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
+            <button disabled={loading || replenishQty <= 0} type="submit" className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
               {loading ? <Loader2 className="animate-spin" /> : 'Confirmar Entrada'}
             </button>
           </form>

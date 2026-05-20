@@ -145,7 +145,7 @@ export const dbService = {
     return (data || [])
       .filter(e => {
         const desc = e.description || '';
-        return !desc.startsWith(ABONO_PREFIX) && !desc.startsWith('⚙️ [CONFIG]');
+        return !desc.startsWith(ABONO_PREFIX) && !desc.startsWith('⚙️ [CONFIG]') && !desc.startsWith('⚙️ [CORTE_ENVIADO]');
       })
       .map(e => {
         let category: ExpenseCategory = 'Otros';

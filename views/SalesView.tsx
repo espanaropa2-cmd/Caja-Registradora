@@ -3,8 +3,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product, Client, SaleItem, SaleStatus, Sale, PaymentMethod } from '../types';
 import { fetchExchangeRate } from '../services/exchangeService';
-import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, ScanLine, UserPlus, Loader2, X, ChevronDown, Camera, Check, Landmark, Smartphone, Banknote } from 'lucide-react';
+import { ShoppingCart, Search, User, Trash2, Plus, Minus, CreditCard, Wallet, ScanLine, UserPlus, Loader2, X, ChevronDown, Camera, Check, Landmark, Smartphone, Banknote, Printer, CheckCircle2 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
+import { printThermalReceipt } from '../services/printService';
 
 interface SalesViewProps {
   useParallelRate?: boolean;
@@ -33,6 +34,8 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
   const [officialRate, setOfficialRate] = useState<number>(0);
   const [parallelRate, setParallelRate] = useState<number>(0);
   const [showBs, setShowBs] = useState(false);
+  const [completedSale, setCompletedSale] = useState<Sale | null>(null);
+  const [completedSaleClientName, setCompletedSaleClientName] = useState<string>('');
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastProcessedRef = useRef<number>(0);
@@ -228,6 +231,27 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
       reference: paymentMethod === PaymentMethod.PAGOMOVIL ? paymentRef : undefined
     };
 
+    const clientName = selectedClient?.name || 'Venta de Contado';
+    const fullSaleObj: Sale = {
+      id: sale.id!,
+      userId: '',
+      clientId: sale.clientId,
+      items: [...cart],
+      total,
+      date: sale.date!,
+      status: saleStatus,
+      amountPaid: finalAmountPaidInUSD,
+      payments: [{
+        id: crypto.randomUUID(),
+        saleId: sale.id!,
+        clientId: sale.clientId || '',
+        amount: finalAmountPaidInUSD,
+        method: paymentMethod,
+        reference: paymentMethod === PaymentMethod.PAGOMOVIL ? paymentRef : undefined,
+        date: sale.date!
+      }]
+    };
+
     try {
       await dbService.createSale(sale, initialPayment);
       setCart([]);
@@ -238,7 +262,8 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
       setIsCartVisible(false);
       const updatedProducts = await dbService.getProducts();
       setProducts(updatedProducts);
-      alert('¡Venta realizada!');
+      setCompletedSale(fullSaleObj);
+      setCompletedSaleClientName(clientName);
     } catch (err) {
       console.error(err);
       alert("Error al procesar venta.");
@@ -568,13 +593,90 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
             <button 
               onClick={handleProcessSale}
               disabled={cart.length === 0 || processing}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white py-4 rounded-2xl font-black text-base shadow-xl uppercase tracking-widest transition-all"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-100 dark:disabled:bg-slate-800/80 disabled:text-slate-400 dark:disabled:text-slate-600 text-white py-4 rounded-2xl font-black text-base shadow-xl hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] uppercase tracking-widest transition-all duration-300 active:scale-95 hover:scale-[1.01] disabled:scale-100 disabled:shadow-none"
             >
               {processing ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Finalizar Venta'}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Modal de Éxito y de Impresión de ticket térmico */}
+      {completedSale && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setCompletedSale(null)} />
+          <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-800">
+            <button 
+              onClick={() => setCompletedSale(null)}
+              className="absolute right-6 top-6 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 transition-colors"
+            >
+              <X size={24} />
+            </button>
+            
+            <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner ring-8 ring-emerald-50/50 dark:ring-emerald-900/10">
+              <CheckCircle2 size={40} />
+            </div>
+            
+            <div className="text-center space-y-2 mb-8">
+              <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">¡Venta Registrada!</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-medium">La operación se ha completado correctamente.</p>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 space-y-3 border border-slate-100 dark:border-slate-800 mb-8 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Factura ID:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">#{completedSale.id.slice(0, 8).toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Cliente:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{completedSaleClientName}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-100 dark:border-slate-700/50 pt-2.5">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Monto USD:</span>
+                <span className="font-black text-slate-900 dark:text-white">${completedSale.total.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between pb-1">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Monto VES (Bs.):</span>
+                <span className="font-black text-emerald-600 dark:text-emerald-400">Bs. {(completedSale.total * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {/* Desktop printer action */}
+              <button 
+                onClick={() => {
+                  const storedProfile = localStorage.getItem('cajapro_profile');
+                  const profileParsed = storedProfile ? JSON.parse(storedProfile) : null;
+                  printThermalReceipt(completedSale, completedSaleClientName, profileParsed, {
+                    rate,
+                    useParallelRate,
+                    showTriplePrice,
+                    officialRate,
+                    parallelRate
+                  });
+                }}
+                className="hidden md:flex w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/10 items-center justify-center gap-2.5 transition-all active:scale-95"
+              >
+                <Printer size={18} /> Imprimir Factura (80mm / 58mm)
+              </button>
+
+              {/* Mobile notification */}
+              <div className="md:hidden p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center border border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">⚠️ Impresión Habilitada Solo en PC</p>
+                <p className="text-[9px] text-slate-500 mt-0.5">El formato miniatura de impresora fiscal/térmica requiere acceso de escritorio.</p>
+              </div>
+
+              <button 
+                type="button"
+                onClick={() => setCompletedSale(null)}
+                className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+              >
+                Nueva Venta / Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Escáner */}
       {isScannerOpen && (

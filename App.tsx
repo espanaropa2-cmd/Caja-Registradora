@@ -35,6 +35,7 @@ import ExpensesView from './views/ExpensesView';
 import SettingsView from './views/SettingsView';
 import AuthView from './views/AuthView';
 import AdminView from './views/AdminView';
+import PinGate from './views/PinGate';
 
 const ADMIN_EMAIL = 'azliersylver@gmail.com';
 
@@ -52,6 +53,13 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('sales');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDashboardUnlocked, setIsDashboardUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (currentView !== 'dashboard') {
+      setIsDashboardUnlocked(false);
+    }
+  }, [currentView]);
 
   // Determinar si es administrador
   const isAdmin = profile?.role === 'admin' || profile?.email === ADMIN_EMAIL;
@@ -82,7 +90,10 @@ const App: React.FC = () => {
           monthlyOperatingExpenses: data.monthly_operating_expenses || 0,
           monthlySalaries: data.monthly_salaries || 0,
           initialInvestmentAmount: data.initial_investment_amount || 0,
-          initialInvestmentLifeMonths: data.initial_investment_life_months || 0
+          initialInvestmentLifeMonths: data.initial_investment_life_months || 0,
+          dashboardPin: data.dashboard_pin || localStorage.getItem(`cajapro_pin_${userId}`) || undefined,
+          recoveryQuestion: data.recovery_question || localStorage.getItem(`cajapro_rec_q_${userId}`) || undefined,
+          recoveryAnswer: data.recovery_answer || localStorage.getItem(`cajapro_rec_a_${userId}`) || undefined
         };
         setProfile(newProfile);
         localStorage.setItem('cajapro_profile', JSON.stringify(newProfile));
@@ -286,7 +297,31 @@ const App: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'dashboard': return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
+      case 'dashboard': 
+        if (!isDashboardUnlocked) {
+          return (
+            <PinGate 
+              user={profile} 
+              isUnlocked={isDashboardUnlocked} 
+              onUnlock={() => setIsDashboardUnlocked(true)} 
+              onUpdateUser={async (p) => {
+                setProfile(p);
+                localStorage.setItem('cajapro_profile', JSON.stringify(p));
+                try {
+                  const { error } = await supabase.from('profiles').update({
+                    dashboard_pin: p.dashboardPin,
+                    recovery_question: p.recoveryQuestion,
+                    recovery_answer: p.recoveryAnswer
+                  }).eq('id', p.id);
+                  if (error) throw error;
+                } catch (dbErr) {
+                  console.warn("DB columns not updated yet or failed, saved locally as fallback:", dbErr);
+                }
+              }} 
+            />
+          );
+        }
+        return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'inventory': return <InventoryView useParallelRate={profile.useParallelRate} />;
       case 'sales': return <SalesView useParallelRate={profile.useParallelRate} showTriplePrice={profile.showTriplePrice} />;
       case 'sales_history': return <SalesHistoryView />;

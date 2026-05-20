@@ -36,6 +36,9 @@ export interface UserProfile {
   monthlySalaries?: number;
   initialInvestmentAmount?: number;
   initialInvestmentLifeMonths?: number;
+  dashboardPin?: string;
+  recoveryQuestion?: string;
+  recoveryAnswer?: string;
 }
 
 export interface AppConfig {

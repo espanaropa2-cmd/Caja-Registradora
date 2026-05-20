@@ -742,10 +742,23 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
 
       {/* ÁREA DE IMPRESIÓN PROFESIONAL (SÓLO DESTELLO PARA PRINTPREVIEW & FALLBACK) */}
       <div 
-        id="printable-report-area" 
-        className="absolute -left-[9999px] top-0 w-[800px] p-10 font-sans border-2 border-slate-950"
-        style={{ backgroundColor: '#ffffff', color: '#000000' }}
+        className="print-container-wrapper"
+        style={{ 
+          position: 'absolute', 
+          width: '800px', 
+          height: '0px', 
+          overflow: 'hidden', 
+          pointerEvents: 'none', 
+          zIndex: -100,
+          left: '0px',
+          top: '0px'
+        }}
       >
+        <div 
+          id="printable-report-area" 
+          className="relative w-[800px] p-10 font-sans border-2 border-slate-950"
+          style={{ backgroundColor: '#ffffff', color: '#000000' }}
+        >
         {/* Cabecera Corporativa */}
         <div className="border-b-2 border-slate-950 pb-6 mb-6 flex justify-between items-end">
           <div>
@@ -922,6 +935,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
           CajaPro - Sistema de Gestión Comercial Intuitiva. Reporte autogenerado para {profileData.email || 'Usuario Principal'}.
         </div>
       </div>
+    </div>
     </div>
   );
 };

@@ -2,8 +2,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/dbService';
 import { Sale, Client, SaleStatus } from '../types';
-import { History, Calendar, Search, Trash2, ArrowUpRight, ShoppingBag, User, Loader2, X, AlertTriangle, RefreshCw, DollarSign, FileUp, FileText } from 'lucide-react';
+import { History, Calendar, Search, Trash2, ArrowUpRight, ShoppingBag, User, Loader2, X, AlertTriangle, RefreshCw, DollarSign, FileUp, FileText, Printer } from 'lucide-react';
 import Papa from 'papaparse';
+import { fetchExchangeRate } from '../services/exchangeService';
+import { printThermalReceipt } from '../services/printService';
 
 type TimeRange = 'hoy' | 'semana' | 'mes' | 'año' | 'todos';
 
@@ -15,6 +17,9 @@ const SalesHistoryView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
+  const [rate, setRate] = useState<number>(0);
+  const [officialRate, setOfficialRate] = useState<number>(0);
+  const [parallelRate, setParallelRate] = useState<number>(0);
 
   const downloadSalesTemplate = () => {
     const csvContent = "Fecha,Cliente,Total,Pagado,Estado\n2024-05-15,Juan Perez,150.00,150.00,COMPLETED\n2024-05-14,Maria Gomez,200.00,50.00,CREDIT";
@@ -85,6 +90,32 @@ const SalesHistoryView: React.FC = () => {
       ]);
       setSales(allSales);
       setClients(allClients);
+
+      try {
+        const storedProfile = localStorage.getItem('cajapro_profile');
+        const profile = storedProfile ? JSON.parse(storedProfile) : null;
+        if (profile) {
+          const showTriple = !!profile.showTriplePrice;
+          const useParallel = !!profile.useParallelRate;
+          if (showTriple) {
+             const [o, par] = await Promise.all([
+               fetchExchangeRate('oficial'),
+               fetchExchangeRate('paralelo')
+             ]);
+             setOfficialRate(o);
+             setParallelRate(par);
+             setRate(useParallel ? par : o);
+          } else {
+             const r = await fetchExchangeRate(useParallel ? 'paralelo' : 'oficial');
+             setRate(r);
+          }
+        } else {
+          const r = await fetchExchangeRate('oficial');
+          setRate(r);
+        }
+      } catch (rateErr) {
+        console.warn("Failed loading rate in history:", rateErr);
+      }
     } catch (err) {
       console.error("Error fetching history:", err);
     }
@@ -526,10 +557,28 @@ const SalesHistoryView: React.FC = () => {
               )}
             </div>
 
-            <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+            <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-end gap-3 items-center">
+              {/* Desktop printer action */}
+              <button 
+                onClick={() => {
+                  const storedProfile = localStorage.getItem('cajapro_profile');
+                  const profileParsed = storedProfile ? JSON.parse(storedProfile) : null;
+                  printThermalReceipt(selectedSale, getClientName(selectedSale.clientId), profileParsed, {
+                    rate: rate || 36.55,
+                    useParallelRate: profileParsed?.useParallelRate,
+                    showTriplePrice: profileParsed?.showTriplePrice,
+                    officialRate: officialRate || 36.55,
+                    parallelRate: parallelRate || 44.50
+                  });
+                }}
+                className="hidden md:flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/10"
+              >
+                <Printer size={16} /> Imprimir Factura (80mm)
+              </button>
+
               <button 
                 onClick={() => setIsDetailsModalOpen(false)}
-                className="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-sm"
+                className="w-full md:w-auto px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-sm text-center"
               >
                 Cerrar Detalle
               </button>

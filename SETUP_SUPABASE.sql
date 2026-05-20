@@ -15,6 +15,9 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sheets_url TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS use_parallel_rate BOOLEAN DEFAULT FALSE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_triple_price BOOLEAN DEFAULT FALSE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_dark_mode BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS dashboard_pin TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS recovery_question TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS recovery_answer TEXT;
 
 -- 2. Asignar rol de administrador al superusuario
 UPDATE profiles SET role = 'admin' WHERE email = 'azliersylver@gmail.com';

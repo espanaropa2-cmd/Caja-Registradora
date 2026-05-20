@@ -63,6 +63,14 @@
                 display: block !important;
                 position: static !important;
             }
+            /* Asegurar que el contenedor wrapper de html2canvas no constriña la impresión */
+            .print-container-wrapper {
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                display: block !important;
+            }
             /* Asegurar que el reporte no quede fuera de pantalla por el posicionamiento absoluto */
             #printable-report-area {
                 position: relative !important;

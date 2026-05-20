@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Store, ArrowRight, ShieldCheck, Loader2, Mail, Lock, Building2, ChevronLeft } from 'lucide-react';
 
-type AuthStep = 'initial' | 'login' | 'profile_setup';
+type AuthStep = 'initial' | 'login' | 'profile_setup' | 'forgot_password';
 
 const AuthView: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [step, setStep] = useState<AuthStep>('initial');
@@ -142,7 +142,12 @@ const AuthView: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Contraseña</label>
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Contraseña</label>
+                  <button type="button" onClick={() => { setStep('forgot_password'); setError(''); }} className="text-[10px] font-black text-blue-600 hover:underline hover:text-blue-700 transition-colors uppercase tracking-widest">
+                    ¿Olvidaste tu clave?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                   <input required type="password" placeholder="••••••••" className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -153,6 +158,63 @@ const AuthView: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                 {!loading && <ArrowRight size={22} />}
               </button>
             </form>
+          )}
+
+          {step === 'forgot_password' && (
+            <div className="space-y-5 animate-in fade-in duration-300">
+              <button type="button" onClick={() => { setStep('login'); setError(''); }} className="flex items-center gap-2 text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-widest mb-2 transition-colors">
+                <ChevronLeft size={16} /> Volver
+              </button>
+              
+              <div className="space-y-1 bg-blue-50 border border-blue-100 p-4 rounded-2xl">
+                <h3 className="text-xs uppercase font-black text-blue-700 tracking-wider">Recuperación de Clave</h3>
+                <p className="text-[11px] text-blue-600 font-semibold leading-relaxed">
+                  Enviaremos un enlace de restauración a tu dirección de correo electrónico registrada.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Tu Correo Electrónico</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input required type="email" placeholder="ej: ventas@mi-negocio.com" className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+              </div>
+
+              <button 
+                onClick={async () => {
+                  if (!email) {
+                    setError("Por favor ingresa tu dirección de correo electrónico.");
+                    return;
+                  }
+                  setLoading(true);
+                  setError('');
+                  try {
+                    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: window.location.origin
+                    });
+                    if (resetError) throw resetError;
+                    setError("¡Enlace de recuperación enviado! Revisa tu correo (y correo no deseado/spam) para restablecer la contraseña.");
+                  } catch (err: any) {
+                    setError(`Error de restauración: ${err.message}. Si no cuentas con SMTP, escribe a soporte para reiniciar tu contraseña manualmente.`);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading || !email} 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-base flex items-center justify-center gap-2 shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : 'Enviar Enlace de Restauración'}
+                {!loading && <ArrowRight size={20} />}
+              </button>
+
+              <div className="mt-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">💡 Nota de Soporte</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                  Si tu instancia de Supabase no tiene activado el envío de correos, contacta al administrador de la base de datos para restablecer la contraseña en la tabla profiles o Auth de Supabase en segundos.
+                </p>
+              </div>
+            </div>
           )}
 
           {step === 'profile_setup' && (
