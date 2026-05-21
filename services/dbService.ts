@@ -1,6 +1,6 @@
 
 import { supabase } from '../supabaseClient';
-import { Product, Client, Sale, Expense, SaleStatus, ExpenseCategory, CreditPayment, AppConfig, UserProfile, SubscriptionRequest, SubscriptionStatus } from '../types';
+import { Product, Client, Sale, SalePayment, Expense, SaleStatus, ExpenseCategory, CreditPayment, AppConfig, UserProfile, SubscriptionRequest, SubscriptionStatus } from '../types';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -280,12 +280,14 @@ export const dbService = {
           amount: p.amount,
           method: p.method,
           reference: p.reference,
-          date: p.date
+          date: p.date,
+          exchangeRate: p.exchange_rate,
+          amountBs: p.amount_bs
         }))
     }));
   },
 
-  async createSale(sale: Partial<Sale>, initialPayment?: { amount: number, method: string, reference?: string }) {
+  async createSale(sale: Partial<Sale>, initialPayment?: { amount: number, method: string, reference?: string, exchangeRate?: number, amountBs?: number }) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: newSale, error: saleError } = await supabase
       .from('sales')
@@ -304,7 +306,7 @@ export const dbService = {
     
     // Registrar el pago inicial si existe
     if (initialPayment && initialPayment.amount > 0) {
-      await supabase.from('sale_payments').insert({
+      const paymentData: any = {
         sale_id: newSale.id,
         client_id: sale.clientId,
         amount: initialPayment.amount,
@@ -312,7 +314,11 @@ export const dbService = {
         reference: initialPayment.reference,
         user_id: user?.id,
         date: new Date().toISOString()
-      });
+      };
+      if (initialPayment.exchangeRate !== undefined) paymentData.exchange_rate = initialPayment.exchangeRate;
+      if (initialPayment.amountBs !== undefined) paymentData.amount_bs = initialPayment.amountBs;
+
+      await supabase.from('sale_payments').insert(paymentData);
     }
 
     for (const item of sale.items || []) {
@@ -394,7 +400,7 @@ export const dbService = {
     if (deleteError) throw deleteError;
   },
 
-  async processDistributedAbono(clientId: string, totalAmount: number, saleIds: string[], paymentDetails: { method: string, reference?: string }) {
+  async processDistributedAbono(clientId: string, totalAmount: number, saleIds: string[], paymentDetails: { method: string, reference?: string, exchangeRate?: number, amountBs?: number }) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: sales } = await supabase.from('sales').select('*').in('id', saleIds).order('date', { ascending: true });
     let remaining = totalAmount;
@@ -410,7 +416,7 @@ export const dbService = {
       }).eq('id', sale.id);
 
       // Guardar pago detallado
-      await supabase.from('sale_payments').insert({
+      const paymentInsert: any = {
         sale_id: sale.id,
         client_id: clientId,
         amount: applied,
@@ -418,7 +424,15 @@ export const dbService = {
         reference: paymentDetails.reference,
         user_id: user?.id,
         date: new Date().toISOString()
-      });
+      };
+      if (paymentDetails.exchangeRate !== undefined) {
+        paymentInsert.exchange_rate = paymentDetails.exchangeRate;
+      }
+      if (paymentDetails.amountBs !== undefined) {
+        paymentInsert.amount_bs = Number((paymentDetails.amountBs * (applied / totalAmount)).toFixed(2));
+      }
+
+      await supabase.from('sale_payments').insert(paymentInsert);
 
       remaining -= applied;
     }
@@ -441,7 +455,9 @@ export const dbService = {
       amount: p.amount,
       method: p.method,
       reference: p.reference,
-      date: p.date
+      date: p.date,
+      exchangeRate: p.exchange_rate,
+      amountBs: p.amount_bs
     }));
   },
 
@@ -464,7 +480,29 @@ export const dbService = {
       amount: p.amount,
       method: p.method,
       reference: p.reference,
-      date: p.date
+      date: p.date,
+      exchangeRate: p.exchange_rate,
+      amountBs: p.amount_bs
+    }));
+  },
+
+  async getAllSalePayments(): Promise<SalePayment[]> {
+    const { data, error } = await supabase
+      .from('sale_payments')
+      .select('*')
+      .order('date', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      saleId: p.sale_id,
+      clientId: p.client_id,
+      amount: p.amount,
+      method: p.method,
+      reference: p.reference,
+      date: p.date,
+      exchangeRate: p.exchange_rate,
+      amountBs: p.amount_bs
     }));
   },
 

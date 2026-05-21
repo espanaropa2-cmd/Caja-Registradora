@@ -36,6 +36,7 @@ import SettingsView from './views/SettingsView';
 import AuthView from './views/AuthView';
 import AdminView from './views/AdminView';
 import PinGate from './views/PinGate';
+import CierreCajaView from './views/CierreCajaView';
 
 const ADMIN_EMAIL = 'azliersylver@gmail.com';
 
@@ -91,6 +92,8 @@ const App: React.FC = () => {
           monthlySalaries: data.monthly_salaries || 0,
           initialInvestmentAmount: data.initial_investment_amount || 0,
           initialInvestmentLifeMonths: data.initial_investment_life_months || 0,
+          operatingExpensesList: data.operating_expenses_list || [],
+          salariesList: data.salaries_list || [],
           dashboardPin: data.dashboard_pin || localStorage.getItem(`cajapro_pin_${userId}`) || undefined,
           recoveryQuestion: data.recovery_question || localStorage.getItem(`cajapro_rec_q_${userId}`) || undefined,
           recoveryAnswer: data.recovery_answer || localStorage.getItem(`cajapro_rec_a_${userId}`) || undefined
@@ -324,6 +327,7 @@ const App: React.FC = () => {
         return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
       case 'inventory': return <InventoryView useParallelRate={profile.useParallelRate} />;
       case 'sales': return <SalesView useParallelRate={profile.useParallelRate} showTriplePrice={profile.showTriplePrice} />;
+      case 'cierre_caja': return <CierreCajaView />;
       case 'sales_history': return <SalesHistoryView />;
       case 'clients': return <ClientsView />;
       case 'credit': return <CreditView useParallelRate={profile.useParallelRate} />;
@@ -340,7 +344,9 @@ const App: React.FC = () => {
           monthly_operating_expenses: p.monthlyOperatingExpenses || 0,
           monthly_salaries: p.monthlySalaries || 0,
           initial_investment_amount: p.initialInvestmentAmount || 0,
-          initial_investment_life_months: p.initialInvestmentLifeMonths || 0
+          initial_investment_life_months: p.initialInvestmentLifeMonths || 0,
+          operating_expenses_list: p.operatingExpensesList || [],
+          salaries_list: p.salariesList || []
         }).eq('id', p.id);
       }} />;
       case 'admin': return isAdmin ? <AdminView /> : <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
@@ -357,7 +363,9 @@ const App: React.FC = () => {
           monthly_operating_expenses: p.monthlyOperatingExpenses || 0,
           monthly_salaries: p.monthlySalaries || 0,
           initial_investment_amount: p.initialInvestmentAmount || 0,
-          initial_investment_life_months: p.initialInvestmentLifeMonths || 0
+          initial_investment_life_months: p.initialInvestmentLifeMonths || 0,
+          operating_expenses_list: p.operatingExpensesList || [],
+          salaries_list: p.salariesList || []
         }).eq('id', p.id);
       }} />;
       default: return <DashboardView />;
@@ -404,6 +412,7 @@ const App: React.FC = () => {
             )}
             <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
             <NavItem view="sales" icon={ShoppingCart} label="Nueva Venta" />
+            <NavItem view="cierre_caja" icon={Lock} label="Cierre de Caja" />
             <NavItem view="sales_history" icon={History} label="Historial" />
             <NavItem view="inventory" icon={Package} label="Inventario" />
             <NavItem view="clients" icon={Users} label="Clientes" />

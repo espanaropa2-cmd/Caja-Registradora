@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend, Sector } from 'recharts';
 import { dbService } from '../services/dbService';
 import { DollarSign, TrendingDown, Package, Users, PieChart as PieIcon, Printer, Loader2, ArrowUpRight, Award, Target, X, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
-import { Sale, Expense, Product, Client } from '../types';
+import { Sale, Expense, Product, Client, SaleStatus } from '../types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -207,10 +207,17 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
   }, [sales, startDate, endDate]);
 
   const stats = useMemo(() => {
-    const revenue = filteredData.fSales.reduce((acc, s) => acc + (s.total || 0), 0);
-    
+    // 1. Ventas Brutas (revenue) of the filtered period:
+    // "las ventas brutas deben ser la sumatoria del precio de venta de cada producto vendido." (for filteredData.fSales)
+    const revenue = filteredData.fSales.reduce((acc, s) => {
+      const saleSum = s.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      return acc + saleSum;
+    }, 0);
+
+    // 2. Utilidad Neta (profit) of the filtered period:
+    // "la utilidad neta en el dashboard debe ser únicamente la suma de ese margen de ganancia de cada producto vendido."
     const productMap = products.reduce((acc, p) => { acc[p.id] = p; return acc; }, {} as any);
-    const grossProfitFromSales = filteredData.fSales.reduce((acc, s) => {
+    const profit = filteredData.fSales.reduce((acc, s) => {
       const saleMargin = s.items.reduce((m, item) => {
         const prod = productMap[item.productId];
         const cost = prod?.cost || 0;
@@ -219,24 +226,70 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
       return acc + saleMargin;
     }, 0);
 
+    // 3. Egresos Totales (totalExpenses) of the filtered period (for indicator card display):
     const traditionalExpenses = filteredData.fExpenses.reduce((acc, e) => acc + e.amount, 0);
     const totalExpenses = traditionalExpenses + proratedFixedCosts;
 
-    const otherExpenses = filteredData.fExpenses
-      .filter(e => e.category === 'Otros')
+    // 4. Money Pending / Accounts Receivable ("dinero por cobrar") as of endDate:
+    // "todos estos datos serán tomados hasta la culminación de la fecha colocada en la vista del dashboard...
+    // (por lo que si estamos viendo fechas anteriores, no se contaran ninguna de las transacciones realizadas después de la fecha colocada)"
+    
+    // Helper to calculate a sale's debt as of a certain endDate
+    const getSaleDebtAtDate = (s: Sale, limitDate: Date) => {
+      if (!s.clientId) return 0;
+      
+      const salePayments = s.payments || [];
+      
+      if (salePayments.length === 0) {
+        if (s.status === SaleStatus.CREDIT) {
+          return Math.max(0, s.total - (s.amountPaid || 0));
+        }
+        return 0;
+      }
+      
+      // Let's find the initial payment. This is the earliest payment, or any payment on the same day as the sale.
+      const sortedPayments = [...salePayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const firstPayment = sortedPayments[0];
+      
+      // If the first payment equaled the total, it was a cash sale from the beginning, so no debt.
+      if (firstPayment.amount >= s.total && new Date(firstPayment.date).getTime() <= new Date(s.date).getTime() + 60000) {
+        return 0; 
+      }
+      
+      const paymentsBeforeEnd = salePayments.filter(p => new Date(p.date) <= limitDate);
+      const amountPaidBeforeEnd = paymentsBeforeEnd.reduce((sum, p) => sum + p.amount, 0);
+      
+      return Math.max(0, s.total - amountPaidBeforeEnd);
+    };
+
+    const salesUpToDate = sales.filter(s => new Date(s.date) <= endDate);
+    const pending = salesUpToDate.reduce((acc, s) => {
+      return acc + getSaleDebtAtDate(s, endDate);
+    }, 0);
+
+    // 5. Cumulative Gross Sales up to endDate
+    const cumulativeGrossSalesValue = salesUpToDate.reduce((acc, s) => {
+      const saleTotalFromItems = s.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      return acc + saleTotalFromItems;
+    }, 0);
+
+    // 6. Cumulative traditional expenses registered up to endDate
+    const cumulativeExpensesValue = expenses
+      .filter(e => new Date(e.date) <= endDate)
       .reduce((acc, e) => acc + e.amount, 0);
 
-    const profit = grossProfitFromSales - otherExpenses - proratedFixedCosts;
-    const realCash = totalCashReceived - totalExpenses;
+    // 7. Efectivo Real (realCash) as of endDate:
+    // "El efectivo real debe ser siempre... la resta de las ventas brutas - los egresos totales - el dinero por cobrar; todos estos datos serán tomados hasta la culminación de la fecha colocada..."
+    const realCash = cumulativeGrossSalesValue - cumulativeExpensesValue - pending;
 
     return { 
       revenue, 
-      totalExpenses, // Total global de egresos (tradicionales + costos fijos prorrateados)
+      totalExpenses, // Total global de egresos (tradicionales + costos fijos prorrateados) de periodo
       profit, 
       realCash,
-      pending: clients.reduce((acc, c) => acc + c.currentDebt, 0) 
+      pending 
     };
-  }, [filteredData, products, clients, proratedFixedCosts, totalCashReceived]);
+  }, [filteredData, products, sales, expenses, endDate, proratedFixedCosts]);
 
   const chartData = useMemo(() => {
     if (period === 'hoy') {

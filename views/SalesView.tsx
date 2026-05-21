@@ -225,10 +225,18 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
       amountPaid: finalAmountPaidInUSD
     };
     
+    const calculatedAmountBs = (paymentMethod === PaymentMethod.PAGOMOVIL || paymentMethod === PaymentMethod.PUNTO)
+      ? (saleStatus === SaleStatus.COMPLETED 
+          ? Number((total * rate).toFixed(2))
+          : (amountPaidMode === 'BS' ? Number(amountPaidStr) : Number((finalAmountPaidInUSD * rate).toFixed(2))))
+      : undefined;
+
     const initialPayment = {
       amount: sale.amountPaid || 0,
       method: paymentMethod,
-      reference: paymentMethod === PaymentMethod.PAGOMOVIL ? paymentRef : undefined
+      reference: paymentMethod === PaymentMethod.PAGOMOVIL ? paymentRef : undefined,
+      exchangeRate: rate,
+      amountBs: calculatedAmountBs
     };
 
     const clientName = selectedClient?.name || 'Venta de Contado';
@@ -248,7 +256,9 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
         amount: finalAmountPaidInUSD,
         method: paymentMethod,
         reference: paymentMethod === PaymentMethod.PAGOMOVIL ? paymentRef : undefined,
-        date: sale.date!
+        date: sale.date!,
+        exchangeRate: rate,
+        amountBs: calculatedAmountBs
       }]
     };
 

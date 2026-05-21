@@ -17,6 +17,18 @@ export interface SubscriptionRequest {
   date: string;
 }
 
+export interface OperatingExpenseItem {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+export interface SalaryItem {
+  id: string;
+  employeeName: string;
+  salary: number;
+}
+
 export interface UserProfile {
   id: string;
   businessName: string;
@@ -39,6 +51,8 @@ export interface UserProfile {
   dashboardPin?: string;
   recoveryQuestion?: string;
   recoveryAnswer?: string;
+  operatingExpensesList?: OperatingExpenseItem[];
+  salariesList?: SalaryItem[];
 }
 
 export interface AppConfig {
@@ -109,6 +123,8 @@ export interface SalePayment {
   method: PaymentMethod;
   reference?: string;
   date: string;
+  exchangeRate?: number;
+  amountBs?: number;
 }
 
 export interface CreditPayment extends SalePayment {
@@ -124,6 +140,7 @@ export interface Expense {
   description: string;
   date: string;
   category: ExpenseCategory;
+  isGrouped?: boolean;
 }
 
-export type ViewType = 'dashboard' | 'inventory' | 'sales' | 'sales_history' | 'clients' | 'credit' | 'expenses' | 'settings' | 'admin';
+export type ViewType = 'dashboard' | 'inventory' | 'sales' | 'cierre_caja' | 'sales_history' | 'clients' | 'credit' | 'expenses' | 'settings' | 'admin';

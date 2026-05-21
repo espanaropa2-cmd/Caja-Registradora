@@ -58,11 +58,20 @@ const CreditView: React.FC<CreditViewProps> = ({ useParallelRate = false }) => {
     
     setLoading(true);
     try {
+      const calculatedAmountBs = (abonoMethod === PaymentMethod.PAGOMOVIL || abonoMethod === PaymentMethod.PUNTO)
+        ? (abonoAmountMode === 'VES' ? Number(abonoAmountStr) : Number((abonoAmountInUSD * rate).toFixed(2)))
+        : undefined;
+
       await dbService.processDistributedAbono(
         selectedClient.id, 
         abonoAmountInUSD, 
         Array.from(selectedSaleIds),
-        { method: abonoMethod, reference: abonoMethod === PaymentMethod.PAGOMOVIL ? abonoRef : undefined }
+        { 
+          method: abonoMethod, 
+          reference: abonoMethod === PaymentMethod.PAGOMOVIL ? abonoRef : undefined,
+          exchangeRate: rate,
+          amountBs: calculatedAmountBs
+        }
       );
       await fetchData();
       setIsAbonoOpen(false);
