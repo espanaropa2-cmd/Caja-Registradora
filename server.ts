@@ -11,6 +11,8 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 async function startServer() {
   const app = express();
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
   const PORT = 3000;
 
   // Habilitar CORS para permitir peticiones desde cualquier origen (necesario para apps móviles)
