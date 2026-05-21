@@ -4,6 +4,7 @@ import cors from "cors";
 import axios from "axios";
 import nodemailer from "nodemailer";
 import { sendBalanceEmail, getSMTPConfig } from "./services/emailService.ts";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // Allow fetching from sites with self-signed or incomplete certificates (like the BCV site)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -237,6 +238,115 @@ function getFriendlySMTPErrMsg(error: any): string {
       res.status(500).json({ 
         error: friendlyDetails,
         details: friendlyDetails
+      });
+    }
+  });
+
+  // Lazy initialize Gemini client inside route handler to prevent startup crashes if key is missing
+  let aiClient: any = null;
+  function getGeminiClient() {
+    if (!aiClient) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("No se ha configurado la variable de entorno GEMINI_API_KEY en la plataforma.");
+      }
+      aiClient = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+    }
+    return aiClient;
+  }
+
+  // API Endpoint for AI Business Audits
+  app.post("/api/analyze-business", async (req, res) => {
+    try {
+      const { products = [], sales = [], expenses = [] } = req.body;
+      const client = getGeminiClient();
+
+      const userPrompt = `Analiza los siguientes datos de un negocio en busca de errores en el registro de datos (ej. costos/precios en negativo, ventas con pérdidas involuntarias) e inconsistencias financieras, además de brindar sugerencias estratégicas.
+
+PRODUCTOS REGISTRADOS EN INVENTARIO:
+${JSON.stringify(products.map((p: any) => ({ name: p.name, price: p.price, cost: p.cost, stock: p.stock, category: p.category })), null, 2)}
+
+VENTAS REGISTRADAS:
+${JSON.stringify(sales.map((s: any) => ({ date: s.date, total: s.total, status: s.status, items: s.items?.map((it: any) => ({ name: it.name, price: it.price, quantity: it.quantity, cost: it.cost })) })), null, 2)}
+
+EGRESOS (Gastos tradicionales registrados):
+${JSON.stringify(expenses.map((e: any) => ({ description: e.description, amount: e.amount, category: e.category, date: e.date })), null, 2)}
+
+Objetivos del análisis:
+1. Errores de datos en el sistema:
+   - Precios negativos o costos negativos.
+   - Cantidades o existencias de stock sustancialmente incoherentes (como artículos con existencias en negativo, ej. -5, de forma prolongada).
+   - Gastos tradicionales con importes negativos.
+2. Incoherencias de margen y pérdidas:
+   - Productos vendidos por un monto de venta inferior al costo unitario de compra guardado en la venta o en su ficha actual. Registra exactamente cuál producto y en qué venta.
+   - Productos en el catálogo cuyo precio de venta al público (PVP) sea menor que su costo de compra unitario.
+3. Descontrol u optimización:
+   - Productos populares sin existencias (stock agotado).
+   - Gastos duplicados o excesivos en el mismo mes.
+
+Por favor, estructura la respuesta de acuerdo a la clase y esquema JSON provistos. Sé explícito al indicar en qué producto, qué fecha de venta o qué descripción de gasto se encuentra el error para que el usuario pueda localizarlo y corregirlo rápidamente.`;
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          summary: {
+            type: Type.STRING,
+            description: "Resumen general explicando detalladamente la sanidad y coherencia de los datos del negocio."
+          },
+          inconsistencies: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                type: { type: Type.STRING, description: "Puede ser: 'error' (datos inválidos como valores negativos) o 'warning' (potencial problema de rentabilidad)." },
+                source: { type: Type.STRING, description: "Faro del dato: 'productos', 'ventas', o 'gastos'." },
+                location: { type: Type.STRING, description: "Especifica exactamente dónde localizarlo. Ej: Producto 'Refresco', Gasto 'Flete de abril', Venta del '21/05/2026'." },
+                description: { type: Type.STRING, description: "Descripción completa y detallada de la incoherencia encontrada." },
+                suggestion: { type: Type.STRING, description: "Sugerencia específica de cómo puede solventar este error." }
+              },
+              required: ["id", "type", "source", "location", "description", "suggestion"]
+            }
+          },
+          tips: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                category: { type: Type.STRING, description: "Categoría de optimización: 'inventario', 'ventas', 'gastos', u 'otros'." },
+                title: { type: Type.STRING, description: "Título directo y accionable." },
+                text: { type: Type.STRING, description: "Explicación de la recomendación para el negocio." }
+              },
+              required: ["category", "title", "text"]
+            }
+          }
+        },
+        required: ["summary", "inconsistencies", "tips"]
+      };
+
+      const response = await client.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: userPrompt,
+        config: {
+          systemInstruction: "Eres un Auditor Financiero y Asesor de Negocios experto en Pymes. Analizas bases de datos para encontrar errores de inserción de datos (como precios inválidos) y dar recomendaciones de rentabilidad.",
+          responseMimeType: "application/json",
+          responseSchema,
+        }
+      });
+
+      const text = response.text || "{}";
+      res.json(JSON.parse(text));
+    } catch (error: any) {
+      console.error("Error in AI analysis:", error);
+      res.status(500).json({ 
+        error: error.message || "No se pudo completar el análisis del negocio por inteligencia artificial. Verifica tus claves de API." 
       });
     }
   });

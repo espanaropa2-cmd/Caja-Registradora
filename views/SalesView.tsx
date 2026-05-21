@@ -134,7 +134,7 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
         }
         return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1 }];
+      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1, cost: product.cost }];
     });
     setSearchTerm('');
     if (navigator.vibrate) navigator.vibrate(50);

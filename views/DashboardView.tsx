@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend, Sector } from 'recharts';
 import { dbService } from '../services/dbService';
-import { DollarSign, TrendingDown, Package, Users, PieChart as PieIcon, Printer, Loader2, ArrowUpRight, Award, Target, X, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { DollarSign, TrendingDown, Package, Users, PieChart as PieIcon, Printer, Loader2, ArrowUpRight, Award, Target, X, ChevronLeft, ChevronRight, FileText, Sparkles, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Sale, Expense, Product, Client, SaleStatus } from '../types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -79,6 +79,38 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
   
   const [activeProfitIndex, setActiveProfitIndex] = useState(0);
   const [activeUnitsIndex, setActiveUnitsIndex] = useState(0);
+
+  // AI Business Auditor State Management
+  const [aiAnalysis, setAiAnalysis] = useState<{ summary: string; inconsistencies: any[]; tips: any[] } | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const runAiAnalysis = async () => {
+    setIsAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/analyze-business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          products,
+          sales,
+          expenses
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error al solicitar análisis de IA.");
+      }
+      const data = await res.json();
+      setAiAnalysis(data);
+    } catch (err: any) {
+      console.error(err);
+      setAiError(err.message || "No se pudo conectar con el servicio de Inteligencia Artificial para auditar tu negocio.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -219,8 +251,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
     const productMap = products.reduce((acc, p) => { acc[p.id] = p; return acc; }, {} as any);
     const profit = filteredData.fSales.reduce((acc, s) => {
       const saleMargin = s.items.reduce((m, item) => {
-        const prod = productMap[item.productId];
-        const cost = prod?.cost || 0;
+        const cost = item.cost !== undefined ? item.cost : (productMap[item.productId]?.cost || 0);
         return m + ((item.price - cost) * item.quantity);
       }, 0);
       return acc + saleMargin;
@@ -375,7 +406,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
     filteredData.fSales.forEach(s => s.items.forEach(it => {
       const prod = fullProdMap[it.productId];
       const cat = prod?.category || 'Varios';
-      const cost = prod?.cost || 0;
+      const cost = it.cost !== undefined ? it.cost : (prod?.cost || 0);
       
       if (!map[cat]) map[cat] = { name: cat, profit: 0, units: 0, revenue: 0 };
       
@@ -791,6 +822,210 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
             </div>
           </div>
         </div>
+      </div>
+
+      {/* AUDITOR DE NEGOCIOS POR INTELIGENCIA ARTIFICIAL (GEMINI API) */}
+      <div id="ai-business-auditor" className="mt-8 bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 lg:p-10 rounded-[3rem] border border-indigo-100 dark:border-slate-800 shadow-sm relative overflow-hidden transition-all">
+        {/* Decorative ambient light */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-widest bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 rounded-full mb-3">
+              <Sparkles size={10} className="animate-pulse" /> Auditoría Inteligente CajaPro
+            </span>
+            <h3 className="text-xl lg:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
+              Análisis de Coherencia y Rentabilidad AI
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl font-medium">
+              Analiza en tiempo real tus productos, transacciones e historial de egresos para detectar inconsistencias humanas (valores en negativo, pérdidas ocultas) y optimizar el rendimiento.
+            </p>
+          </div>
+
+          <div className="shrink-0">
+            <button
+              onClick={runAiAnalysis}
+              disabled={isAiLoading}
+              className={`relative overflow-hidden inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 shadow-md ${
+                isAiLoading
+                  ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-indigo-500/20 active:bg-indigo-800 cursor-pointer'
+              }`}
+            >
+              {isAiLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} /> Analizando Datos...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} className="text-indigo-200 animate-bounce" /> {aiAnalysis ? 'Actualizar Análisis' : 'Auditar mi Negocio'}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Loading placeholder */}
+        {isAiLoading && (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-indigo-100 rounded-full animate-ping absolute opacity-30" />
+              <div className="w-16 h-16 border-4 border-t-indigo-600 border-r-indigo-400 border-b-transparent border-l-transparent rounded-full animate-spin relative" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-700 dark:text-slate-300">Auditoría en proceso por Gemini AI...</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium mt-1">
+                Inspeccionando ventas, costos por item, gastos periódicos y el inventario para mapear incoherencias de usuario.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {aiError && (
+          <div className="p-5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-2xl flex gap-3 items-start text-rose-700 dark:text-rose-300">
+            <AlertCircle className="shrink-0 mt-0.5" size={18} />
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider">Error de Análisis AI</p>
+              <p className="text-xs font-medium mt-1">{aiError}</p>
+              <button onClick={runAiAnalysis} className="text-xs font-bold underline mt-2 hover:text-rose-800 block text-left">
+                Reintentar auditoría
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Results Block */}
+        {!isAiLoading && aiAnalysis && (
+          <div className="space-y-6">
+            {/* Summary Banner */}
+            <div className="p-5 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <p className="text-xs font-black uppercase text-indigo-500 dark:text-indigo-400 tracking-wider mb-2">Diagnóstico General del Negocio</p>
+              <p className="text-xs lg:text-sm text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                {aiAnalysis.summary}
+              </p>
+            </div>
+
+            {/* Inconsistencies Column */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase text-rose-500 dark:text-rose-400 tracking-wider">
+                    Incoherencias y Errores Detectados ({aiAnalysis.inconsistencies?.length || 0})
+                  </span>
+                </div>
+
+                {aiAnalysis.inconsistencies && aiAnalysis.inconsistencies.length > 0 ? (
+                  <div className="space-y-3">
+                    {aiAnalysis.inconsistencies.map((item: any, idx: number) => {
+                      const isError = item.type === 'error';
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className={`p-4 rounded-2xl border transition-all flex gap-3 items-start ${
+                            isError
+                              ? 'bg-rose-50/70 border-rose-100 dark:bg-rose-950/10 dark:border-rose-900/20 text-rose-900 dark:text-rose-200'
+                              : 'bg-amber-50/70 border-amber-100 dark:bg-amber-950/10 dark:border-amber-900/20 text-amber-900 dark:text-amber-200'
+                          }`}
+                        >
+                          <div className="mt-0.5 shrink-0">
+                            {isError ? (
+                              <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
+                            ) : (
+                              <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />
+                            )}
+                          </div>
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
+                                isError ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-200' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
+                              }`}>
+                                {item.source}
+                              </span>
+                              <span className="text-xs font-extrabold font-mono opacity-85">
+                                Ubicación: {item.location}
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium leading-relaxed">
+                              {item.description}
+                            </p>
+                            <div className="text-[11px] font-semibold border-t border-slate-200/50 dark:border-slate-800/50 pt-1.5 flex items-start gap-1">
+                              <span className="font-extrabold">Acción sugerida:</span>
+                              <span className="opacity-90">{item.suggestion}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/20 rounded-2xl flex flex-col items-center text-center space-y-2 py-8">
+                    <CheckCircle className="text-emerald-500" size={28} />
+                    <div>
+                      <p className="text-xs font-black uppercase text-emerald-800 dark:text-emerald-300">¡Todo en Orden!</p>
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400/80 font-medium max-w-sm mt-0.5">
+                        No se han detectado inconsistencias matemáticas, montos negativos ni pérdidas por costo unitario en el catálogo. ¡Buen control!
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Strategic Tips Column */}
+              <div className="space-y-4">
+                <p className="text-xs font-black uppercase text-indigo-500 dark:text-indigo-400 tracking-wider">
+                  Tips Estratégicos y de Gestión
+                </p>
+
+                {aiAnalysis.tips && aiAnalysis.tips.length > 0 ? (
+                  <div className="space-y-3">
+                    {aiAnalysis.tips.map((tip: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex gap-3 items-start shadow-xs"
+                      >
+                        <div className="p-1.5 bg-indigo-100/60 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
+                          <CheckCircle size={14} />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-black uppercase bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded tracking-wider">
+                              {tip.category}
+                            </span>
+                            <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+                              {tip.title}
+                            </h4>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed mt-0.5">
+                            {tip.text}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 font-medium italic">Presione 'Auditar mi Negocio' para recabar consejos.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State / Initial Promo Banner */}
+        {!isAiLoading && !aiAnalysis && !aiError && (
+          <div className="flex flex-col md:flex-row items-center gap-6 p-6 bg-white dark:bg-slate-900 border border-dashed border-indigo-200 dark:border-slate-800 rounded-2xl mt-4">
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+              <Sparkles size={24} className="animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">¿Listo para auditar tu contabilidad?</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                La Inteligencia Artificial cruzará el inventario, costos por artículo, ventas y egresos para asegurarse de que no haya pérdidas ocultas ni errores humanos de tipeo. ¡Haz clic en el botón superior derecho para iniciar!
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ÁREA DE IMPRESIÓN PROFESIONAL (SÓLO DESTELLO PARA PRINTPREVIEW & FALLBACK) */}
