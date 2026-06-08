@@ -1,6 +1,6 @@
 
 import { supabase } from '../supabaseClient';
-import { Product, Client, Sale, SalePayment, Expense, SaleStatus, ExpenseCategory, CreditPayment, AppConfig, UserProfile, SubscriptionRequest, SubscriptionStatus } from '../types';
+import { Product, Client, Sale, SalePayment, Expense, SaleStatus, ExpenseCategory, CreditPayment, AppConfig, UserProfile, SubscriptionRequest, SubscriptionStatus, AppChangelog } from '../types';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -31,7 +31,17 @@ export const dbService = {
       cost: p.cost,
       stock: p.stock,
       barcode: p.barcode,
-      category: p.category
+      category: p.category,
+      seasonalDiscountEnabled: p.seasonal_discount_enabled || false,
+      seasonalDiscountPrice: p.seasonal_discount_price || 0,
+      cashDiscountEnabled: p.cash_discount_enabled || false,
+      cashDiscountPrice: p.cash_discount_price || 0,
+      wholesaleDiscountEnabled: p.wholesale_discount_enabled || false,
+      wholesaleTiers: Array.isArray(p.wholesale_tiers) ? p.wholesale_tiers : [],
+      isService: p.is_service || false,
+      serviceBasePrice: p.service_base_price || 0,
+      usedProducts: Array.isArray(p.used_products) ? p.used_products : [],
+      extraExpenses: Array.isArray(p.extra_expenses) ? p.extra_expenses : []
     }));
   },
 
@@ -70,7 +80,17 @@ export const dbService = {
       stock: currentStock,
       barcode: product.barcode || '',
       category: product.category || 'General',
-      user_id: user.id 
+      user_id: user.id,
+      seasonal_discount_enabled: product.seasonalDiscountEnabled || false,
+      seasonal_discount_price: product.seasonalDiscountPrice !== undefined ? Number(product.seasonalDiscountPrice) : 0,
+      cash_discount_enabled: product.cashDiscountEnabled || false,
+      cash_discount_price: product.cashDiscountPrice !== undefined ? Number(product.cashDiscountPrice) : 0,
+      wholesale_discount_enabled: product.wholesaleDiscountEnabled || false,
+      wholesale_tiers: product.wholesaleTiers || [],
+      is_service: product.isService || false,
+      service_base_price: product.serviceBasePrice !== undefined ? Number(product.serviceBasePrice) : 0,
+      used_products: product.usedProducts || [],
+      extra_expenses: product.extraExpenses || []
     };
 
     const { error: productError } = await supabase.from('products').upsert(productData);
@@ -126,7 +146,17 @@ export const dbService = {
       stock: Number(p.stock) || 0,
       barcode: p.barcode || '',
       category: p.category || 'General',
-      user_id: user.id
+      user_id: user.id,
+      seasonal_discount_enabled: p.seasonalDiscountEnabled || false,
+      seasonal_discount_price: p.seasonalDiscountPrice !== undefined ? Number(p.seasonalDiscountPrice) : 0,
+      cash_discount_enabled: p.cashDiscountEnabled || false,
+      cash_discount_price: p.cashDiscountPrice !== undefined ? Number(p.cashDiscountPrice) : 0,
+      wholesale_discount_enabled: p.wholesaleDiscountEnabled || false,
+      wholesale_tiers: p.wholesaleTiers || [],
+      is_service: p.isService || false,
+      service_base_price: p.serviceBasePrice !== undefined ? Number(p.serviceBasePrice) : 0,
+      used_products: p.usedProducts || [],
+      extra_expenses: p.extraExpenses || []
     }));
 
     const { error } = await supabase.from('products').upsert(productsData);
@@ -322,8 +352,35 @@ export const dbService = {
     }
 
     for (const item of sale.items || []) {
-      const { data: prod } = await supabase.from('products').select('stock').eq('id', item.productId).single();
-      if (prod) await supabase.from('products').update({ stock: prod.stock - item.quantity }).eq('id', item.productId);
+      if (item.isService) {
+        // Registrar gastos adicionales como egresos
+        if (item.extraExpenses && item.extraExpenses.length > 0) {
+          for (const extra of item.extraExpenses) {
+            const expenseAmount = extra.amount * item.quantity;
+            if (expenseAmount > 0) {
+              await this.saveExpense({
+                description: `Servicio: ${item.name} - Gasto: ${extra.name}`,
+                amount: expenseAmount,
+                category: 'Otros',
+                date: new Date().toISOString()
+              });
+            }
+          }
+        }
+        // Descontar stock de productos usados
+        if (item.usedProducts && item.usedProducts.length > 0) {
+          for (const used of item.usedProducts) {
+            const qtyToDeduct = used.qty * item.quantity;
+            const { data: prod } = await supabase.from('products').select('stock').eq('id', used.productId).single();
+            if (prod) {
+              await supabase.from('products').update({ stock: prod.stock - qtyToDeduct }).eq('id', used.productId);
+            }
+          }
+        }
+      } else {
+        const { data: prod } = await supabase.from('products').select('stock').eq('id', item.productId).single();
+        if (prod) await supabase.from('products').update({ stock: prod.stock - item.quantity }).eq('id', item.productId);
+      }
     }
     if (sale.status === SaleStatus.CREDIT && sale.clientId) {
       const pending = (sale.total || 0) - (sale.amountPaid || 0);
@@ -380,9 +437,21 @@ export const dbService = {
 
     // 1. Restaurar stock de los productos vendidos
     for (const item of (sale.items || [])) {
-      const { data: prod } = await supabase.from('products').select('stock').eq('id', item.productId).single();
-      if (prod) {
-        await supabase.from('products').update({ stock: prod.stock + item.quantity }).eq('id', item.productId);
+      if (item.isService) {
+        if (item.usedProducts && item.usedProducts.length > 0) {
+          for (const used of item.usedProducts) {
+            const qtyToRestore = used.qty * item.quantity;
+            const { data: prod } = await supabase.from('products').select('stock').eq('id', used.productId).single();
+            if (prod) {
+              await supabase.from('products').update({ stock: prod.stock + qtyToRestore }).eq('id', used.productId);
+            }
+          }
+        }
+      } else {
+        const { data: prod } = await supabase.from('products').select('stock').eq('id', item.productId).single();
+        if (prod) {
+          await supabase.from('products').update({ stock: prod.stock + item.quantity }).eq('id', item.productId);
+        }
       }
     }
 
@@ -546,6 +615,7 @@ export const dbService = {
       role: p.role || 'user',
       useParallelRate: p.use_parallel_rate || false,
       showTriplePrice: p.show_triple_price || false,
+      aiAuditEnabled: p.ai_audit_enabled || false,
       isDarkMode: p.is_dark_mode || false
     }));
   },
@@ -567,6 +637,7 @@ export const dbService = {
     if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
     if (updates.useParallelRate !== undefined) dbUpdates.use_parallel_rate = updates.useParallelRate;
     if (updates.showTriplePrice !== undefined) dbUpdates.show_triple_price = updates.showTriplePrice;
+    if (updates.aiAuditEnabled !== undefined) dbUpdates.ai_audit_enabled = updates.aiAuditEnabled;
     if (updates.isDarkMode !== undefined) dbUpdates.is_dark_mode = updates.isDarkMode;
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', profileId);
@@ -750,5 +821,31 @@ export const dbService = {
       date: new Date().toISOString(),
       user_id: user.id
     });
+  },
+
+  async getAppChangelogs(): Promise<AppChangelog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('app_changelogs')
+        .select('*')
+        .order('release_date', { ascending: false });
+      
+      if (error) {
+        // Fallback safely to empty array if table not yet created
+        return [];
+      }
+      
+      return (data || []).map(item => ({
+        id: item.id,
+        version: item.version,
+        releaseDate: item.release_date,
+        title: item.title,
+        description: item.description,
+        changes: Array.isArray(item.changes) ? item.changes : [],
+        createdAt: item.created_at
+      }));
+    } catch {
+      return [];
+    }
   }
 };

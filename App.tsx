@@ -87,6 +87,7 @@ const App: React.FC = () => {
           lastPaymentRef: data.last_payment_ref,
           useParallelRate: data.use_parallel_rate || false,
           showTriplePrice: data.show_triple_price || false,
+          aiAuditEnabled: data.ai_audit_enabled || false,
           isDarkMode: data.is_dark_mode || false,
           monthlyOperatingExpenses: data.monthly_operating_expenses || 0,
           monthlySalaries: data.monthly_salaries || 0,
@@ -324,7 +325,7 @@ const App: React.FC = () => {
             />
           );
         }
-        return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} />;
+        return <DashboardView useParallelRate={profile.useParallelRate} businessName={profile.businessName} isDarkMode={profile.isDarkMode} aiAuditEnabled={profile.aiAuditEnabled} />;
       case 'inventory': return <InventoryView useParallelRate={profile.useParallelRate} />;
       case 'sales': return <SalesView useParallelRate={profile.useParallelRate} showTriplePrice={profile.showTriplePrice} />;
       case 'cierre_caja': return <CierreCajaView />;

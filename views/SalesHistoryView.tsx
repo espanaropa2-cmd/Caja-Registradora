@@ -489,8 +489,33 @@ const SalesHistoryView: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                       {selectedSale.items.map((item, idx) => (
-                        <tr key={idx} className="text-sm">
-                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300">{item.name}</td>
+                        <tr key={idx} className="text-xs md:text-sm border-b border-slate-50 dark:border-slate-800/40 last:border-0">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <span>{item.name}</span>
+                              {item.isService && (
+                                <span className="text-[8px] font-black bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-md uppercase tracking-widest scale-95 shrink-0">
+                                  Servicio
+                                </span>
+                              )}
+                            </div>
+                            {item.isService && (
+                              <div className="mt-1 pl-3.5 border-l border-dashed border-slate-200 dark:border-slate-800 space-y-1">
+                                {item.usedProducts && item.usedProducts.length > 0 && (
+                                  <p className="text-[10px] text-slate-450 dark:text-slate-500 font-medium">
+                                    <strong className="text-slate-400 dark:text-slate-500 font-black uppercase text-[8px] tracking-widest">Insumos: </strong>
+                                    {item.usedProducts.map(u => `${u.name} (x${u.qty})`).join(', ')}
+                                  </p>
+                                )}
+                                {item.extraExpenses && item.extraExpenses.length > 0 && (
+                                  <p className="text-[10px] text-slate-450 dark:text-slate-500 font-medium">
+                                    <strong className="text-slate-400 dark:text-slate-500 font-black uppercase text-[8px] tracking-widest">Adicionales: </strong>
+                                    {item.extraExpenses.map(e => `${e.name} ($${e.amount})`).join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-center font-black text-slate-500 dark:text-slate-400">{item.quantity}</td>
                           <td className="px-6 py-4 text-right font-bold text-slate-600 dark:text-slate-400">${item.price.toLocaleString()}</td>
                           <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-slate-100">${(item.price * item.quantity).toLocaleString()}</td>

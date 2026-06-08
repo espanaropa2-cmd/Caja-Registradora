@@ -44,13 +44,45 @@ export const printThermalReceipt = (
     const priceToShow = isBsOnly ? item.price * conversionRate : item.price;
     const subtotalToShow = isBsOnly ? (item.price * item.quantity) * conversionRate : item.price * item.quantity;
     const currencySign = isBsOnly ? 'Bs. ' : '$';
+
+    // Service breakdown details
+    let serviceBreakdown = '';
+    if (item.isService) {
+      const parts: string[] = [];
+      if (item.usedProducts && item.usedProducts.length > 0) {
+        parts.push(`  * Insumos:`);
+        item.usedProducts.forEach(up => {
+          const upPrice = up.sellingPrice || 0;
+          const upCostToShow = isBsOnly ? upPrice * conversionRate : upPrice;
+          parts.push(`    - ${up.name} (x${up.qty}): ${currencySign}${upCostToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        });
+      }
+      if (item.extraExpenses && item.extraExpenses.length > 0) {
+        parts.push(`  * Gastos:`);
+        item.extraExpenses.forEach(ee => {
+          const eeCostToShow = isBsOnly ? ee.amount * conversionRate : ee.amount;
+          parts.push(`    - ${ee.name}: ${currencySign}${eeCostToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        });
+      }
+      if (parts.length > 0) {
+        serviceBreakdown = `
+          <div style="font-size: 10px; color: #555; font-family: monospace; white-space: pre-wrap; margin-top: 2px; padding-left: 10px; border-left: 1px dotted #888;">
+${parts.join('\n')}
+          </div>
+        `;
+      }
+    }
+
     return `
       <div style="margin-bottom: 8px;">
-        <div style="font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.name}</div>
+        <div style="font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          ${item.name} ${item.isService ? '<span style="font-size: 9px; background: #eee; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">SERV</span>' : ''}
+        </div>
         <div style="display: flex; justify-content: space-between; font-size: 11px; color: #444; margin-top: 2px;">
           <span>${item.quantity} x ${currencySign}${priceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           <span style="font-weight: bold; color: #000;">${currencySign}${subtotalToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
+        ${serviceBreakdown}
       </div>
     `;
   }).join('');

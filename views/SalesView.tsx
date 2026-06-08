@@ -117,24 +117,84 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
     };
   }, [isScannerOpen, products]);
 
+  const getCalculatedPrice = (productId: string, quantity: number, currentPaymentMethod: PaymentMethod | string): number => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return 0;
+
+    // 1st Priority (Strongest Wholesale discount): Active if wholesaleDiscountEnabled && quantity reaches wholesaleTiers
+    if (product.wholesaleDiscountEnabled && product.wholesaleTiers && product.wholesaleTiers.length > 0) {
+      const sortedTiers = [...product.wholesaleTiers].sort((a, b) => b.qty - a.qty);
+      const matchingTier = sortedTiers.find(t => quantity >= t.qty);
+      if (matchingTier) {
+        return matchingTier.price;
+      }
+    }
+
+    // 2nd Priority (Cash discount): Active if paymentMethod is EFECTIVO
+    if (currentPaymentMethod === PaymentMethod.EFECTIVO && product.cashDiscountEnabled && product.cashDiscountPrice !== undefined) {
+      return product.cashDiscountPrice;
+    }
+
+    // 3rd Priority (Seasonal discount)
+    if (product.seasonalDiscountEnabled && product.seasonalDiscountPrice !== undefined) {
+      return product.seasonalDiscountPrice;
+    }
+
+    // Fallback: Default product price
+    return product.price;
+  };
+
+  // Automatically recalculate unit prices reactively when paymentMethod or products change
+  useEffect(() => {
+    setCart(prev => {
+      let changed = false;
+      const updated = prev.map(item => {
+        const currentPrice = getCalculatedPrice(item.productId, item.quantity, paymentMethod);
+        if (item.price !== currentPrice) {
+          changed = true;
+          return { ...item, price: currentPrice };
+        }
+        return item;
+      });
+      return changed ? updated : prev;
+    });
+  }, [paymentMethod, products]);
+
   const addToCart = (product: Product) => {
     const now = Date.now();
     if (now - lastProcessedRef.current < 500) return; 
     lastProcessedRef.current = now;
-    if (product.stock <= 0) {
+    if (!product.isService && product.stock <= 0) {
       alert(`¡Sin stock de ${product.name}!`);
       return;
     }
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) {
+        if (!product.isService && existing.quantity >= product.stock) {
           alert("Límite de stock alcanzado");
           return prev;
         }
-        return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map(item => {
+          if (item.productId === product.id) {
+            const nextQty = item.quantity + 1;
+            const nextPrice = getCalculatedPrice(product.id, nextQty, paymentMethod);
+            return { ...item, quantity: nextQty, price: nextPrice };
+          }
+          return item;
+        });
       }
-      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1, cost: product.cost }];
+      const initialPrice = getCalculatedPrice(product.id, 1, paymentMethod);
+      return [...prev, { 
+        productId: product.id, 
+        name: product.name, 
+        price: initialPrice, 
+        quantity: 1, 
+        cost: product.cost,
+        isService: product.isService,
+        usedProducts: product.usedProducts,
+        extraExpenses: product.extraExpenses
+      }];
     });
     setSearchTerm('');
     if (navigator.vibrate) navigator.vibrate(50);
@@ -145,11 +205,12 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
       if (item.productId === productId) {
         const product = products.find(p => p.id === productId);
         const newQty = Math.max(0, item.quantity + delta);
-        if (product && newQty > product.stock) {
+        if (product && !product.isService && newQty > product.stock) {
           alert("Stock máximo alcanzado");
           return item;
         }
-        return { ...item, quantity: newQty };
+        const nextPrice = getCalculatedPrice(productId, newQty, paymentMethod);
+        return { ...item, quantity: newQty, price: nextPrice };
       }
       return item;
     }).filter(item => item.quantity > 0));
@@ -433,6 +494,47 @@ const SalesView: React.FC<SalesViewProps> = ({ useParallelRate = false, showTrip
                 <div className="flex-1 min-w-0 pr-4">
                   <p className="font-bold text-slate-900 dark:text-slate-100 truncate text-sm">{item.name}</p>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">${item.price.toLocaleString()} c/u</p>
+                  {(() => {
+                    const product = products.find(p => p.id === item.productId);
+                    if (!product) return null;
+                    
+                    let discountLabel = "";
+                    let labelColor = "";
+
+                    if (product.wholesaleDiscountEnabled && product.wholesaleTiers && product.wholesaleTiers.length > 0) {
+                      const sortedTiers = [...product.wholesaleTiers].sort((a, b) => b.qty - a.qty);
+                      const matchingTier = sortedTiers.find(t => item.quantity >= t.qty);
+                      if (matchingTier) {
+                        discountLabel = `MAYOR x${matchingTier.qty}`;
+                        labelColor = "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
+                      }
+                    }
+
+                    if (!discountLabel && paymentMethod === PaymentMethod.EFECTIVO && product.cashDiscountEnabled && product.cashDiscountPrice !== undefined) {
+                      if (item.price === product.cashDiscountPrice) {
+                        discountLabel = "EFECTIVO";
+                        labelColor = "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400";
+                      }
+                    }
+
+                    if (!discountLabel && product.seasonalDiscountEnabled && product.seasonalDiscountPrice !== undefined) {
+                      if (item.price === product.seasonalDiscountPrice) {
+                        discountLabel = "TEMPORADA";
+                        labelColor = "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400";
+                      }
+                    }
+
+                    if (discountLabel) {
+                      return (
+                        <div className="mt-1">
+                          <span className={`inline-block text-[8px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded-md ${labelColor}`}>
+                            {discountLabel}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   {showTriplePrice && officialRate > 0 && parallelRate > 0 && (
                     <div className="flex flex-col mt-1 bg-slate-100 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
                        <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase leading-none">Mixto: ${((item.price * parallelRate) / officialRate).toFixed(2)}</span>

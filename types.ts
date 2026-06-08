@@ -43,6 +43,7 @@ export interface UserProfile {
   role?: 'admin' | 'user';
   useParallelRate?: boolean;
   showTriplePrice?: boolean;
+  aiAuditEnabled?: boolean;
   isDarkMode?: boolean;
   monthlyOperatingExpenses?: number;
   monthlySalaries?: number;
@@ -64,6 +65,24 @@ export interface AppConfig {
   binanceUser: string;
 }
 
+export interface WholesaleTier {
+  qty: number;
+  price: number;
+}
+
+export interface ServiceUsedProduct {
+  productId: string;
+  name: string;
+  qty: number;
+  unitCost: number;
+  sellingPrice?: number;
+}
+
+export interface ServiceExtraExpense {
+  name: string;
+  amount: number;
+}
+
 export interface Product {
   id: string;
   userId: string;
@@ -73,6 +92,16 @@ export interface Product {
   stock: number;
   barcode: string;
   category: string;
+  seasonalDiscountEnabled?: boolean;
+  seasonalDiscountPrice?: number;
+  cashDiscountEnabled?: boolean;
+  cashDiscountPrice?: number;
+  wholesaleDiscountEnabled?: boolean;
+  wholesaleTiers?: WholesaleTier[];
+  isService?: boolean;
+  serviceBasePrice?: number;
+  usedProducts?: ServiceUsedProduct[];
+  extraExpenses?: ServiceExtraExpense[];
 }
 
 export interface Client {
@@ -90,6 +119,10 @@ export interface SaleItem {
   quantity: number;
   price: number;
   cost?: number;
+  isService?: boolean;
+  serviceBasePrice?: number;
+  usedProducts?: ServiceUsedProduct[];
+  extraExpenses?: ServiceExtraExpense[];
 }
 
 export enum SaleStatus {
@@ -145,3 +178,13 @@ export interface Expense {
 }
 
 export type ViewType = 'dashboard' | 'inventory' | 'sales' | 'cierre_caja' | 'sales_history' | 'clients' | 'credit' | 'expenses' | 'settings' | 'admin';
+
+export interface AppChangelog {
+  id: string;
+  version: string;
+  releaseDate: string;
+  title: string;
+  description?: string;
+  changes: string[];
+  createdAt?: string;
+}

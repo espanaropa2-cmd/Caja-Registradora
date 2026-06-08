@@ -23,6 +23,7 @@ import {
   XCircle,
   Bell,
   Activity,
+  Sparkles,
   History as HistoryIcon,
   DollarSign,
   Archive,
@@ -465,6 +466,25 @@ const AdminView: React.FC = () => {
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${profile.showTriplePrice ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
                           >
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${profile.showTriplePrice ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+
+                        {/* Auditoría de Negocios por IA */}
+                        <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/10 border border-violet-100 dark:border-violet-800 rounded-2xl group transition-all mb-1">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-lg">
+                              <Sparkles size={16} className="animate-pulse" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-violet-900 dark:text-violet-200 uppercase tracking-tighter">Auditoría IA</p>
+                              <p className="text-[8px] font-bold text-violet-400 dark:text-violet-500 uppercase tracking-widest whitespace-nowrap">Análisis con Gemini</p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => handleUpdate(profile.id, { aiAuditEnabled: !profile.aiAuditEnabled })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${profile.aiAuditEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${profile.aiAuditEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                           </button>
                         </div>
 

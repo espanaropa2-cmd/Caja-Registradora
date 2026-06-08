@@ -96,3 +96,44 @@ GRANT ALL ON app_config TO authenticated;
 GRANT ALL ON subscription_requests TO authenticated;
 GRANT ALL ON app_config TO service_role;
 GRANT ALL ON subscription_requests TO service_role;
+
+-- =========================================================================
+-- NUEVOS CAMBIOS PARA AUDITORÍA INTELIGENTE CON IA Y CHANGELOG DE LA APP
+-- =========================================================================
+
+-- A. Habilitar la columna de Auditoría IA en los perfiles
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ai_audit_enabled BOOLEAN DEFAULT FALSE;
+
+-- B. Crear la tabla para el registro de cambios (Changelog) de la aplicación
+CREATE TABLE IF NOT EXISTS app_changelogs (
+  id TEXT PRIMARY KEY,
+  version TEXT NOT NULL,
+  release_date DATE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  changes TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- C. Habilitar seguridad de nivel de fila (RLS) en app_changelogs
+ALTER TABLE app_changelogs ENABLE ROW LEVEL SECURITY;
+
+-- D. Construir políticas para lectura y escritura de changelogs
+DROP POLICY IF EXISTS "Todos pueden leer changelogs" ON app_changelogs;
+CREATE POLICY "Todos pueden leer changelogs" ON app_changelogs 
+FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Solo admins modifican changelogs" ON app_changelogs;
+CREATE POLICY "Solo admins modifican changelogs" ON app_changelogs 
+FOR ALL USING (
+    EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+    )
+);
+
+-- E. Otorgar permisos generales para usar la tabla
+GRANT ALL ON app_changelogs TO authenticated;
+GRANT ALL ON app_changelogs TO anon;
+GRANT ALL ON app_changelogs TO service_role;
+

@@ -62,9 +62,10 @@ interface DashboardViewProps {
   useParallelRate?: boolean;
   businessName?: string;
   isDarkMode?: boolean;
+  aiAuditEnabled?: boolean;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, businessName = 'Mi Negocio', isDarkMode = false }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, businessName = 'Mi Negocio', isDarkMode = false, aiAuditEnabled = false }) => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -825,7 +826,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
       </div>
 
       {/* AUDITOR DE NEGOCIOS POR INTELIGENCIA ARTIFICIAL (GEMINI API) */}
-      <div id="ai-business-auditor" className="mt-8 bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 lg:p-10 rounded-[3rem] border border-indigo-100 dark:border-slate-800 shadow-sm relative overflow-hidden transition-all">
+      {aiAuditEnabled && (
+        <div id="ai-business-auditor" className="mt-8 bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 lg:p-10 rounded-[3rem] border border-indigo-100 dark:border-slate-800 shadow-sm relative overflow-hidden transition-all">
         {/* Decorative ambient light */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
@@ -1027,6 +1029,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ useParallelRate = false, 
           </div>
         )}
       </div>
+      )}
 
       {/* ÁREA DE IMPRESIÓN PROFESIONAL (SÓLO DESTELLO PARA PRINTPREVIEW & FALLBACK) */}
       <div 
