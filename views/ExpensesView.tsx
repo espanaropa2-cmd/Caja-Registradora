@@ -262,6 +262,12 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ user, onUpdateUser }) => {
   const isOperatingItem = (expenseDesc: string) => {
     if (!expenseDesc) return false;
     const desc = expenseDesc.toLowerCase();
+    
+    // Si es un gasto transaccional de servicio (ej: "Servicio: Corte - Gasto: Loción"), no lo agrupamos en fijos
+    if (desc.includes('servicio:')) {
+      return false;
+    }
+
     if (operatingExpenses.some(oe => 
       oe.name && oe.name.trim() !== '' && 
       (desc.includes(oe.name.toLowerCase().trim()) || oe.name.toLowerCase().trim().includes(desc))
@@ -277,6 +283,12 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ user, onUpdateUser }) => {
   const isSalaryItem = (expenseDesc: string) => {
     if (!expenseDesc) return false;
     const desc = expenseDesc.toLowerCase();
+
+    // Si es un gasto transaccional de servicio, no lo agrupamos en nóminas
+    if (desc.includes('servicio:')) {
+      return false;
+    }
+
     if (salaries.some(sal => 
       sal.employeeName && sal.employeeName.trim() !== '' && 
       (desc.includes(sal.employeeName.toLowerCase().trim()) || sal.employeeName.toLowerCase().trim().includes(desc))

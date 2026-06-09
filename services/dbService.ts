@@ -54,7 +54,7 @@ export const dbService = {
     const currentCost = Number(product.cost) || 0;
 
     // 1. Detección de reabastecimiento en edición
-    if (!isNew && product.id) {
+    if (!isNew && product.id && !product.isService) {
       const { data: existing } = await supabase
         .from('products')
         .select('stock')
@@ -97,7 +97,7 @@ export const dbService = {
     if (productError) throw productError;
 
     // 2. Inversión inicial si es nuevo
-    if (isNew && currentStock > 0 && currentCost > 0) {
+    if (isNew && currentStock > 0 && currentCost > 0 && !product.isService) {
       await this.saveExpense({
         description: `Inversión Inicial: ${product.name} (${currentStock} uds)`,
         amount: currentStock * currentCost,

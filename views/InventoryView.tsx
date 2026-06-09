@@ -842,7 +842,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
 
                 {/* Composición Estructurada para SERVICIOS */}
                 {isService && (
-                  <div className="space-y-6 bg-purple-50/30 dark:bg-purple-950/20 p-6 lg:p-8 rounded-[2.5rem] border border-purple-200/50 dark:border-purple-800/30 max-h-[80vh] overflow-y-auto">
+                  <div className="space-y-6 bg-purple-50/40 dark:bg-purple-950/20 p-5 sm:p-6 lg:p-8 rounded-[2.5rem] border border-purple-200/50 dark:border-purple-800/30">
                     <h4 className="text-[10px] font-black text-purple-700 dark:text-purple-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-1.5">
                       <Settings size={14} /> Estructura del Servicio
                     </h4>
@@ -855,7 +855,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                         <select
                           value={tempSelectedProductId}
                           onChange={(e) => setTempSelectedProductId(e.target.value)}
-                          className="flex-1 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-900 dark:text-slate-100 font-bold text-sm"
+                          className="w-full flex-1 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-900 dark:text-slate-100 font-bold text-sm min-w-0"
                         >
                           <option value="">-- Seleccionar Insumo --</option>
                           {products.filter(p => !p.isService).map(p => (
@@ -864,13 +864,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                             </option>
                           ))}
                         </select>
-                        <div className="flex gap-2 shrink-0">
+                        <div className="flex gap-2 w-full sm:w-auto shrink-0">
                           <input
                             type="number"
                             min="1"
                             value={tempProductQty}
                             onChange={(e) => setTempProductQty(Math.max(1, Number(e.target.value)))}
-                            className="w-20 px-3 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-black text-center text-slate-900 dark:text-slate-100"
+                            className="flex-1 sm:w-20 px-3 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-black text-center text-slate-900 dark:text-slate-100"
+                            placeholder="Cant"
                           />
                           <button
                             type="button"
@@ -896,7 +897,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                               setTempSelectedProductId('');
                               setTempProductQty(1);
                             }}
-                            className="px-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
+                            className="flex-1 sm:flex-none px-5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition active:scale-95 whitespace-nowrap"
                           >
                             Agregar
                           </button>
@@ -904,22 +905,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                       </div>
 
                       {usedProducts.length > 0 ? (
-                        <div className="space-y-2 max-h-32 overflow-y-auto pr-1 border border-slate-150 dark:border-slate-800 rounded-xl p-2 bg-white dark:bg-slate-900/50">
+                        <div className="space-y-2 max-h-36 overflow-y-auto pr-1 border border-slate-150 dark:border-slate-800 rounded-xl p-2 bg-white dark:bg-slate-900/50">
                           {usedProducts.map((u, index) => {
                             const original = products.find(p => p.id === u.productId);
                             const displayPrice = original ? original.price : u.sellingPrice;
                             return (
-                              <div key={index} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-b-0">
-                                <div>
-                                  <span className="font-bold text-slate-800 dark:text-slate-200">{u.name}</span>
-                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-2">Cant: {u.qty} x ${displayPrice}</span>
+                              <div key={index} className="flex items-center justify-between gap-3 text-xs py-2 border-b border-slate-100 dark:border-slate-800/80 last:border-b-0">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate" title={u.name}>{u.name}</div>
+                                  <div className="text-[10px] text-slate-400 dark:text-slate-500">Cant: {u.qty} x ${displayPrice.toFixed(2)}</div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-slate-705 dark:text-slate-300">${(u.qty * displayPrice).toFixed(2)}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-bold text-slate-705 dark:text-slate-300 font-mono">${(u.qty * displayPrice).toFixed(2)}</span>
                                   <button
                                     type="button"
                                     onClick={() => setUsedProducts(usedProducts.filter((_, i) => i !== index))}
-                                    className="text-rose-500 hover:text-rose-700 p-1"
+                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors"
                                   >
                                     <Trash size={14} />
                                   </button>
@@ -937,50 +938,52 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                     <div className="space-y-3 pt-3 border-t border-purple-200/40">
                       <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block text-xs">Gastos Adicionales (Delivery, Repuestos Extra)</label>
                       
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="text"
                           placeholder="Repuesto extra, traslado, etc..."
                           value={tempExpenseName}
                           onChange={(e) => setTempExpenseName(e.target.value)}
-                          className="flex-1 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-900 dark:text-slate-100 font-bold text-sm"
+                          className="w-full flex-1 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-900 dark:text-slate-100 font-bold text-sm min-w-0"
                         />
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00 $"
-                          value={tempExpenseAmount || ''}
-                          onChange={(e) => setTempExpenseAmount(Number(e.target.value))}
-                          className="w-24 px-3 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-black text-center text-slate-900 dark:text-slate-100"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!tempExpenseName || tempExpenseAmount <= 0) return;
-                            setExtraExpenses([...extraExpenses, {
-                              name: tempExpenseName,
-                              amount: tempExpenseAmount
-                            }]);
-                            setTempExpenseName('');
-                            setTempExpenseAmount(0);
-                          }}
-                          className="px-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
-                        >
-                          +
-                        </button>
+                        <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="Monto $"
+                            value={tempExpenseAmount || ''}
+                            onChange={(e) => setTempExpenseAmount(Number(e.target.value))}
+                            className="flex-1 sm:w-24 px-3 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-black text-center text-slate-900 dark:text-slate-100"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!tempExpenseName || tempExpenseAmount <= 0) return;
+                              setExtraExpenses([...extraExpenses, {
+                                name: tempExpenseName,
+                                amount: tempExpenseAmount
+                              }]);
+                              setTempExpenseName('');
+                              setTempExpenseAmount(0);
+                            }}
+                            className="flex-1 sm:flex-none px-5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition active:scale-95 whitespace-nowrap"
+                          >
+                            Agregar
+                          </button>
+                        </div>
                       </div>
 
                       {extraExpenses.length > 0 ? (
-                        <div className="space-y-2 max-h-32 overflow-y-auto pr-1 border border-slate-150 dark:border-slate-800 rounded-xl p-2 bg-white dark:bg-slate-900/50">
+                        <div className="space-y-2 max-h-36 overflow-y-auto pr-1 border border-slate-150 dark:border-slate-800 rounded-xl p-2 bg-white dark:bg-slate-900/50">
                           {extraExpenses.map((e, index) => (
-                            <div key={index} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-b-0">
-                              <span className="font-bold text-slate-800 dark:text-slate-200">{e.name}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-705 dark:text-slate-300">${e.amount.toFixed(2)}</span>
+                            <div key={index} className="flex items-center justify-between gap-3 text-xs py-2 border-b border-slate-100 dark:border-slate-800/80 last:border-b-0">
+                              <span className="font-bold text-slate-800 dark:text-slate-200 min-w-0 truncate" title={e.name}>{e.name}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-bold text-slate-705 dark:text-slate-300 font-mono">${e.amount.toFixed(2)}</span>
                                 <button
                                   type="button"
                                   onClick={() => setExtraExpenses(extraExpenses.filter((_, i) => i !== index))}
-                                  className="text-rose-500 hover:text-rose-700 p-1"
+                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors"
                                 >
                                   <Trash size={14} />
                                 </button>
@@ -994,25 +997,25 @@ const InventoryView: React.FC<InventoryViewProps> = ({ useParallelRate = false }
                     </div>
 
                     {/* RESUMEN DE COMPOSICIÓN EN TIEMPO REAL */}
-                    <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2">
+                    <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 shadow-inner">
                       <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Resumen en Tiempo Real</p>
                       <div className="flex justify-between text-xs">
                         <span>Precio Base de Trabajo:</span>
-                        <span className="font-bold">${serviceBasePrice.toFixed(2)}</span>
+                        <span className="font-bold font-mono">${serviceBasePrice.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-xs">
                         <span>Insumos Usados ({usedProducts.length}):</span>
-                        <span className="font-bold">
+                        <span className="font-bold font-mono text-slate-300">
                           ${usedProducts.reduce((sum, item) => sum + (item.qty * (products.find(p => p.id === item.productId)?.price || item.sellingPrice)), 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between text-xs pb-2 border-b border-white/10">
                         <span>Gastos Extras:</span>
-                        <span className="font-bold">${extraExpenses.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}</span>
+                        <span className="font-bold font-mono">${extraExpenses.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between text-sm font-black text-emerald-300">
+                      <div className="flex justify-between items-center text-sm font-black text-emerald-300 pt-1">
                         <span>Precio Final Calculado:</span>
-                        <span className="text-lg font-black text-white">$ {formPrice.toFixed(2)}</span>
+                        <span className="text-xl font-black text-white font-mono">$ {formPrice.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>

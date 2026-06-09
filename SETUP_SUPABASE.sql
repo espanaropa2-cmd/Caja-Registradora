@@ -137,3 +137,13 @@ GRANT ALL ON app_changelogs TO authenticated;
 GRANT ALL ON app_changelogs TO anon;
 GRANT ALL ON app_changelogs TO service_role;
 
+
+-- =========================================================================
+-- NUEVAS COLUMNAS EN LA TABLA DE PRODUCTOS PARA INTEGRACIÓN DE SERVICIOS
+-- =========================================================================
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_service BOOLEAN DEFAULT FALSE;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS service_base_price NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS used_products JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS extra_expenses JSONB DEFAULT '[]'::jsonb;
+
+
